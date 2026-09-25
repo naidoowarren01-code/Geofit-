@@ -389,6 +389,7 @@
   </div>
   <div class="sidebar-foot">
     <div class="who"><strong id="staff-email">Operations</strong>Geofit Staff</div>
+    <button class="logout-btn" style="margin-bottom:6px;" onclick="openChangePassword()">Change Password</button>
     <button class="logout-btn" onclick="handleStaffLogout()">Logout</button>
   </div>
 </div>
@@ -576,6 +577,21 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="pw-overlay">
+  <div class="modal-box">
+    <div class="modal-title-bar">&#128274; Change Password</div>
+    <div class="modal-body">
+      <div class="login-field"><label>New Password</label><input type="password" id="pw-new" placeholder="At least 6 characters"></div>
+      <div class="login-field" style="margin-bottom:0;"><label>Confirm New Password</label><input type="password" id="pw-confirm" placeholder="Re-enter new password"></div>
+      <div class="login-error" id="pw-error"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal('pw-overlay')">Cancel</button>
+      <button class="btn btn-primary" id="pw-save-btn" onclick="handleChangePassword()">Save Password</button>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
   const SUPABASE_URL = "https://ffkcukglohdifxcvrafz.supabase.co";
@@ -671,6 +687,32 @@
     okBtn.onclick = function() { closeModal('confirm-overlay'); };
     actions.appendChild(okBtn);
     document.getElementById('confirm-overlay').classList.add('show');
+  }
+
+  function openChangePassword() {
+    document.getElementById('pw-new').value = '';
+    document.getElementById('pw-confirm').value = '';
+    document.getElementById('pw-error').style.display = 'none';
+    document.getElementById('pw-overlay').classList.add('show');
+  }
+
+  function handleChangePassword() {
+    const pw = document.getElementById('pw-new').value;
+    const confirm = document.getElementById('pw-confirm').value;
+    const errDiv = document.getElementById('pw-error');
+    errDiv.style.display = 'none';
+    if (pw.length < 6) { errDiv.textContent = 'Password must be at least 6 characters.'; errDiv.style.display = 'block'; return; }
+    if (pw !== confirm) { errDiv.textContent = 'Passwords do not match.'; errDiv.style.display = 'block'; return; }
+    const btn = document.getElementById('pw-save-btn');
+    btn.disabled = true;
+    btn.textContent = 'Saving...';
+    sbClient.auth.updateUser({ password: pw }).then(function(res) {
+      btn.disabled = false;
+      btn.textContent = 'Save Password';
+      if (res.error) { errDiv.textContent = res.error.message; errDiv.style.display = 'block'; return; }
+      closeModal('pw-overlay');
+      showAlert('Password Changed', 'Your password has been updated. Use it next time you log in.');
+    });
   }
 
   function handleFinancialsClick() {
