@@ -404,7 +404,8 @@
     <div class="topbar-spacer"></div>
     <button class="btn btn-primary" onclick="addNewRecord()"><span class="btn-icon">&#128203;</span>Add New Record</button>
     <button class="btn btn-primary" onclick="handleSaveUpdate()"><span class="btn-icon">&#128190;</span>Save and Update</button>
-    <button class="btn btn-primary" onclick="showConfirm('Clear All', 'Are you sure you want to clear all fields on this file? Unsaved changes will be lost.', 'Clear All', function(){ showToast('Cleared'); })"><span class="btn-icon">&#10006;</span>Clear All</button>
+    <button class="btn btn-primary" onclick="showConfirm('Clear All', 'Are you sure you want to clear all fields on this file? Unsaved changes will be lost.', 'Clear All', function(){ clearFileForm(); showToast('Cleared'); })"><span class="btn-icon">&#10006;</span>Clear All</button>
+    <button class="btn btn-primary" onclick="generateInstructions()"><span class="btn-icon">&#128196;</span>Generate Instructions</button>
   </div>
 
   <div class="page-pad">
@@ -593,6 +594,7 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script>
   const SUPABASE_URL = "https://ffkcukglohdifxcvrafz.supabase.co";
   const SUPABASE_KEY = "sb_publishable_AfKi7sWGCiuh3Jx_Mw1BHg_LWmXgAQQ";
@@ -824,6 +826,11 @@
     ['f-instruction-date','f-client-file-number','f-vessel-name','f-vessel-operator',
      'f-eta','f-booking-ref','f-stack-date','f-commodity','f-empty-depot','f-rate'
     ].forEach(function(id) { document.getElementById(id).value = ''; });
+    ['dd-transporter','dd-client','dd-terminal','dd-address'].forEach(function(id) {
+      const el = document.getElementById(id);
+      if (el) el.selectedIndex = 0;
+    });
+    document.getElementById('f-traffic').selectedIndex = 0;
     document.getElementById('container-rows').innerHTML = '';
     renderChips();
     renderDetail();
@@ -884,8 +891,11 @@
     });
   }
 
-  function handleSaveUpdate() {
-    if (!currentFileId) { showAlert('No File Loaded', 'Click "Add New Record" to start a new file, or search for an existing container number first.'); return; }
+  function handleSaveUpdate(silent) {
+    if (!currentFileId) {
+      showAlert('No File Loaded', 'Click "Add New Record" to start a new file, or search for an existing container number first.');
+      return Promise.reject('no-file');
+    }
     const payload = {
       instruction_date: document.getElementById('f-instruction-date').value || null,
       transporter: document.getElementById('dd-transporter').value,
@@ -904,9 +914,11 @@
       agreed_rate: document.getElementById('f-rate').value,
       updated_at: new Date().toISOString()
     };
-    sbClient.from('shipment_files').update(payload).eq('id', currentFileId).then(function(res) {
-      if (res.error) { showAlert('Could Not Save File', res.error.message); return; }
-      saveAllContainers();
+    return sbClient.from('shipment_files').update(payload).eq('id', currentFileId).then(function(res) {
+      if (res.error) { showAlert('Could Not Save File', res.error.message); throw res.error; }
+      return saveAllContainers();
+    }).then(function() {
+      if (!silent) showAlert('Geofit Logistics Hub', 'File saved successfully.');
     });
   }
 
@@ -935,9 +947,97 @@
         });
       }
     });
-    Promise.all(promises).then(function() {
-      showAlert('Geofit Logistics Hub', 'File saved successfully.');
+    return Promise.all(promises);
+  }
+
+  function generateInstructions() {
+    if (!currentFileId) {
+      showAlert('No File Loaded', 'Add or load a file before generating instructions.');
+      return;
+    }
+    handleSaveUpdate(true).then(function() {
+      buildInstructionsPDF();
+      showToast('Instructions PDF downloaded');
+    }).catch(function() { /* save already showed the error */ });
+  }
+
+  function buildInstructionsPDF() {
+    const jsPDFCtor = window.jspdf.jsPDF;
+    const doc = new jsPDFCtor();
+    let y = 18;
+    const LABEL_X = 15, VALUE_X = 75, PAGE_BOTTOM = 275;
+
+    function ensureRoom(rows) {
+      if (y + rows * 7 > PAGE_BOTTOM) { doc.addPage(); y = 18; }
+    }
+    function field(label, value) {
+      ensureRoom(1);
+      doc.setFont(undefined, 'bold'); doc.text(label + ':', LABEL_X, y);
+      doc.setFont(undefined, 'normal'); doc.text(String(value || '—'), VALUE_X, y);
+      y += 7;
+    }
+
+    doc.setFontSize(16); doc.setFont(undefined, 'bold');
+    doc.text('Geofit Logistics — Shipping Instructions', LABEL_X, y);
+    y += 10;
+    doc.setFontSize(11);
+
+    field('Geofit File Number', document.getElementById('f-file-number').value);
+    field('Instruction Date', document.getElementById('f-instruction-date').value);
+    field('Transporter', document.getElementById('dd-transporter').value);
+    field('Traffic', document.getElementById('f-traffic').value);
+    field('Vessel Name', document.getElementById('f-vessel-name').value);
+    field('Vessel Operator', document.getElementById('f-vessel-operator').value);
+    field('Terminal', document.getElementById('dd-terminal').value);
+    field('ETA', document.getElementById('f-eta').value);
+    field('Booking Reference', document.getElementById('f-booking-ref').value);
+    field('Stack Date', document.getElementById('f-stack-date').value);
+    field('Commodity', document.getElementById('f-commodity').value);
+    field('Empty Depot', document.getElementById('f-empty-depot').value);
+
+    y += 2;
+    ensureRoom(2);
+    doc.setFont(undefined, 'bold'); doc.text('Delivery / Packing Address:', LABEL_X, y); y += 7;
+    doc.setFont(undefined, 'normal');
+    const addrLines = doc.splitTextToSize(document.getElementById('dd-address').value || '—', 180);
+    ensureRoom(addrLines.length);
+    doc.text(addrLines, LABEL_X, y);
+    y += addrLines.length * 7 + 4;
+
+    ensureRoom(2);
+    doc.setFontSize(13); doc.setFont(undefined, 'bold');
+    doc.text('Containers', LABEL_X, y); y += 8;
+    doc.setFontSize(11);
+
+    const rows = getTrackedRows();
+    if (!rows.length) {
+      doc.setFont(undefined, 'normal');
+      doc.text('No containers added to this file.', LABEL_X, y);
+      y += 7;
+    }
+    rows.forEach(function(row) {
+      const cells = row.querySelectorAll('td');
+      const num = cells[1].querySelector('input').value || '—';
+      const size = cells[2].querySelector('input').value || '—';
+      const weight = cells[3].querySelector('input').value || '—';
+      const remarks = cells[5].querySelectorAll('input')[0].value || '—';
+      ensureRoom(2);
+      doc.setFont(undefined, 'bold'); doc.text('Container Number: ', LABEL_X, y);
+      doc.setFont(undefined, 'normal'); doc.text(num + '   Size: ' + size + '   Gross Weight: ' + weight, LABEL_X + 42, y);
+      y += 7;
+      const remarkLines = doc.splitTextToSize('Trans Remarks: ' + remarks, 180);
+      ensureRoom(remarkLines.length);
+      doc.text(remarkLines, LABEL_X, y);
+      y += remarkLines.length * 6 + 4;
     });
+
+    y += 3;
+    ensureRoom(1);
+    doc.setFont(undefined, 'bold'); doc.text('Agreed Rate:', LABEL_X, y);
+    doc.setFont(undefined, 'normal'); doc.text(document.getElementById('f-rate').value || '—', VALUE_X, y);
+
+    const fileNum = document.getElementById('f-file-number').value || 'instructions';
+    doc.save(fileNum + '-Instructions.pdf');
   }
 
   /* ── Containers table ── */
