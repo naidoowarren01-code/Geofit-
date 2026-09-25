@@ -1,0 +1,1110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>GeoFit Ops Hub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f2f4f6;
+    --header: #0f2a4a;
+    --header-dark: #0a1e38;
+    --card: #ffffff;
+    --border: #dde1e6;
+    --text: #1f2328;
+    --text-soft: #6b7280;
+    --input-bg: #ffffff;
+    --input-border: #c7ccd3;
+    --input-focus: #0f2a4a;
+    --accent: #0f2a4a;
+    --green: #16a34a;
+    --open: #16a34a;
+    --open-bg: #dcfce7;
+    --closed: #6b7280;
+    --closed-bg: #eceef1;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: 'Inter', -apple-system, sans-serif;
+    display: flex;
+  }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    width: 224px; flex-shrink: 0; background: var(--header-dark); color: #fff;
+    display: flex; flex-direction: column; height: 100vh; position: sticky; top: 0;
+  }
+  .sidebar-logo {
+    padding: 22px 20px; font-size: 15px; font-weight: 800; letter-spacing: 0.6px;
+    border-bottom: 1px solid #2c313a;
+  }
+  .sidebar-nav { flex: 1; padding: 14px 10px; }
+  .sidebar-link {
+    display: flex; align-items: center; gap: 11px; padding: 10px 12px; border-radius: 7px;
+    color: #aab0ba; font-size: 13.5px; font-weight: 500; cursor: pointer; margin-bottom: 2px;
+  }
+  .sidebar-link .ic { width: 18px; text-align: center; font-size: 14px; }
+  .sidebar-link:hover { background: #262b33; color: #e5e7eb; }
+  .sidebar-link.active { background: var(--accent); color: #fff; font-weight: 600; }
+  .sidebar-foot {
+    padding: 14px 16px; border-top: 1px solid #2c313a; font-size: 12.5px;
+  }
+  .sidebar-foot .who { color: #9aa1ab; margin-bottom: 10px; }
+  .sidebar-foot .who strong { color: #fff; display: block; font-size: 13px; }
+  .logout-btn {
+    width: 100%; background: transparent; border: 1px solid #3a4049; color: #cfd3d9;
+    border-radius: 6px; height: 34px; font-size: 12.5px; cursor: pointer;
+  }
+
+  /* ── Login screen ── */
+  #login-screen {
+    position: fixed; inset: 0; background: var(--header-dark); display: flex;
+    align-items: center; justify-content: center; z-index: 999; padding: 20px;
+  }
+  .login-card {
+    background: #fff; border-radius: 12px; padding: 34px 30px; width: 100%; max-width: 360px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.4);
+  }
+  .login-card h2 { font-size: 17px; margin: 0 0 4px; }
+  .login-card .sub { font-size: 12.5px; color: var(--text-soft); margin-bottom: 22px; }
+  .login-field { margin-bottom: 14px; }
+  .login-field label { display: block; font-size: 12px; font-weight: 700; margin-bottom: 5px; }
+  .login-field input {
+    width: 100%; height: 40px; border-radius: 6px; border: 1.5px solid var(--input-border);
+    background: #fff; padding: 0 11px; font-size: 13.5px; color: var(--text);
+  }
+  .login-btn {
+    width: 100%; height: 42px; background: var(--accent); color: #fff; border: none;
+    border-radius: 6px; font-weight: 700; font-size: 13.5px; cursor: pointer; margin-top: 6px;
+  }
+  .login-error { color: #dc2626; font-size: 12.5px; margin-top: 10px; display: none; }
+  #app-shell { display: none; }
+  #app-shell.show { display: flex; width: 100%; }
+
+  /* ── Main area ── */
+  .main-area { flex: 1; height: 100vh; overflow-y: auto; }
+  .topbar {
+    position: sticky; top: 0; z-index: 10; background: #fff; border-bottom: 1px solid var(--border);
+    padding: 14px 28px; display: flex; align-items: center; gap: 12px;
+  }
+  .topbar input[type=text] {
+    flex: 1; max-width: 480px; height: 40px; border-radius: 8px; border: 1px solid var(--border);
+    background: #f4f5f7; padding: 0 14px; font-size: 13.5px;
+  }
+  .topbar-spacer { flex: 1; }
+
+  .page-pad { padding: 24px 28px 60px; }
+  .page-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+  .page-head h2 { font-size: 17px; margin: 0; }
+  .file-strip { font-size: 13px; color: var(--text-soft); margin-bottom: 18px; }
+  .file-strip strong { color: var(--text); }
+  .status-chip-badge {
+    display: inline-block; padding: 3px 12px; border-radius: 20px; font-size: 12px; font-weight: 700;
+    background: #fff3d6; color: #b45309; letter-spacing: 0.3px;
+  }
+
+  .wrap { max-width: 1000px; }
+
+  .panel {
+    box-shadow: 0 1px 3px rgba(20,25,35,0.06);
+  }
+  .panel.accent-top { border-top: 4px solid var(--accent) !important; }
+  .panel-title {
+    display: flex; align-items: center; gap: 8px; font-size: 14.5px; font-weight: 700;
+    color: var(--text); margin-bottom: 18px; padding-bottom: 10px; border-bottom: 2px solid #eef1f5;
+  }
+  .panel-title .bar { width: 4px; height: 16px; background: var(--accent); border-radius: 2px; }
+
+  thead tr { background: #f6f9fd; }
+  th { border-bottom: 2px solid #dbe6f5 !important; }
+
+  .titlebar {
+    background: var(--header); color: #fff; border-radius: 10px 10px 0 0;
+    padding: 18px 24px; display: flex; align-items: center; justify-content: space-between;
+  }
+  .titlebar h1 { font-size: 19px; font-weight: 700; letter-spacing: 0.3px; margin: 0; }
+  .titlebar .close { color: #9aa3af; font-size: 18px; cursor: pointer; }
+
+  .toolbar {
+    background: var(--header-dark); padding: 14px 24px; display: flex; gap: 10px;
+    align-items: center; flex-wrap: wrap;
+  }
+  .toolbar input[type=text] {
+    flex: 1; min-width: 180px; height: 38px; border-radius: 6px; border: 1px solid #3a3f47;
+    background: #333944; color: #fff; padding: 0 12px; font-size: 13px;
+  }
+  .toolbar input::placeholder { color: #8b929c; }
+  .btn {
+    height: 38px; border: none; border-radius: 6px; padding: 0 16px; font-size: 13px;
+    font-weight: 600; cursor: pointer; white-space: nowrap;
+  }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-muted { background: #444a54; color: #e5e7eb; }
+  .btn-ghost { background: transparent; color: #cfd3d9; border: 1px solid #4a505a; }
+
+  .panel { background: var(--card); border: 1.5px solid #d8dde3; border-top: none; padding: 24px; }
+  .panel:last-of-type { border-radius: 0 0 10px 10px; }
+
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px 18px; }
+  @media (max-width: 720px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+
+  .field label {
+    display: block; font-size: 13px; font-weight: 700; color: var(--text);
+    margin-bottom: 6px;
+  }
+  .field input, .field select {
+    width: 100%; height: 38px; border-radius: 6px; border: 1.5px solid var(--input-border);
+    background: var(--input-bg); padding: 0 11px; font-size: 13px; color: var(--text);
+    font-family: 'Inter', sans-serif;
+  }
+  .field input:focus, .field select:focus { outline: none; border-color: var(--input-focus); box-shadow: 0 0 0 3px rgba(59,130,246,0.15); }
+  .field input:disabled { background: #f1f2f4; color: var(--text-soft); }
+
+  .detail-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+  @media (max-width: 900px) { .detail-cards { grid-template-columns: repeat(2, 1fr); } }
+  .detail-card { border: 1.5px solid #cbd2d9; border-radius: 8px; padding: 16px; background: #fff; }
+  .detail-card .field { margin-bottom: 14px; }
+  .detail-card .field:last-child { margin-bottom: 0; }
+
+  input[type="date"]::-webkit-calendar-picker-indicator {
+    filter: invert(28%) sepia(92%) saturate(3207%) hue-rotate(346deg) brightness(97%) contrast(101%);
+    cursor: pointer;
+    transform: scale(1.15);
+  }
+
+  .section-gap { height: 22px; }
+
+  .containers-head {
+    display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;
+  }
+  .containers-head .hint { font-size: 12px; color: var(--text-soft); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; }
+  th {
+    text-align: left; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.4px;
+    color: var(--text-soft); padding: 8px 8px; border-bottom: 2px solid var(--border);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .table-scroll { overflow-x: auto; }
+  .table-scroll::-webkit-scrollbar { height: 8px; }
+  .table-scroll::-webkit-scrollbar-track { background: #eef0f3; border-radius: 6px; }
+  .table-scroll::-webkit-scrollbar-thumb { background: #c3c9d1; border-radius: 6px; }
+  .table-scroll::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+  td { padding: 8px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  td input, td select {
+    width: 100%; height: 34px; border-radius: 6px; border: 1px solid var(--input-border);
+    background: var(--input-bg); padding: 0 8px; font-size: 12.5px; font-family: 'IBM Plex Mono', monospace;
+    color: var(--text);
+  }
+  td select { font-family: 'Inter', sans-serif; }
+
+  .status-pill {
+    display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 20px;
+    font-size: 11.5px; font-weight: 600; border: none; cursor: pointer;
+  }
+  .status-open { background: var(--open-bg); color: var(--open); }
+  .status-closed { background: var(--closed-bg); color: var(--closed); }
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+  .msg-cell { display: flex; align-items: center; gap: 6px; height: 34px; }
+  .msg-cell input[type=checkbox] { width: 16px; height: 16px; flex-shrink: 0; accent-color: var(--accent); margin: 0; }
+  .msg-cell input:not([type=checkbox]) { flex: 1; min-width: 0; height: 34px; line-height: 34px; }
+  .msg-cell .field-note { font-size: 9.5px; color: var(--text-soft); display: block; margin-top: 2px; }
+
+  .wa-btn {
+    background: #25d366; color: #fff; border: none; border-radius: 6px; height: 32px;
+    padding: 0 12px; font-size: 12px; font-weight: 600; cursor: pointer;
+  }
+  .del-btn {
+    background: #fee2e2; color: #dc2626; border: none; border-radius: 6px; width: 32px; height: 32px;
+    cursor: pointer; font-size: 13px;
+  }
+  .add-container-btn {
+    background: var(--accent); border: none; color: #fff; border-radius: 7px;
+    padding: 9px 16px; font-size: 12.5px; font-weight: 700; cursor: pointer;
+  }
+  .add-container-btn:hover { background: var(--header-dark); }
+  .btn-icon { margin-right: 6px; }
+
+  .rate-box input { max-width: 260px; }
+
+  .broadcast-card {
+    border: 1px solid var(--border); border-radius: 8px; padding: 16px 18px; margin-top: 20px;
+    background: #fafbfc;
+  }
+  .broadcast-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .broadcast-head h3 { font-size: 13.5px; margin: 0; }
+  .broadcast-head span { font-size: 11.5px; color: var(--text-soft); }
+  .num-chip-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+  .num-chip {
+    display: inline-flex; align-items: center; gap: 6px; background: #eef1f5; border-radius: 20px;
+    padding: 5px 6px 5px 12px; font-size: 12px; font-family: 'IBM Plex Mono', monospace;
+  }
+  .num-chip button { background: none; border: none; color: #9aa1ab; cursor: pointer; font-size: 13px; padding: 2px 6px; }
+  .broadcast-add { display: flex; gap: 8px; margin-bottom: 12px; }
+  .broadcast-add input { flex: 1; height: 36px; border-radius: 6px; border: 1px solid var(--input-border); background: var(--input-bg); padding: 0 10px; font-size: 13px; }
+  .copy-msg-btn { background: var(--header); color: #fff; }
+
+  .bottom-actions {
+    display: flex; gap: 10px; flex-wrap: wrap; margin-top: 22px; padding-top: 20px; border-top: 1px solid var(--border);
+  }
+  .bottom-actions .btn { background: #fff; border: 1px solid var(--border); color: var(--text); }
+  .bottom-actions .btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ── Live Tracking panel ── */
+  .tracking-panel {
+    background: #fff; border: 1px solid var(--border); border-top: none;
+    padding: 20px 24px; display: none;
+  }
+  .tracking-panel.show { display: block; }
+  .tracking-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+  .tracking-left { display: flex; align-items: center; gap: 12px; }
+  .tracking-container-num {
+    font-family: 'IBM Plex Mono', monospace; font-size: 17px; font-weight: 600; color: var(--text);
+  }
+  .live-badge {
+    display: inline-flex; align-items: center; gap: 6px; background: #ecfdf3; color: #16a34a;
+    font-size: 11px; font-weight: 700; letter-spacing: 0.4px; padding: 4px 10px; border-radius: 20px;
+  }
+  .live-dot {
+    width: 7px; height: 7px; border-radius: 50%; background: #16a34a;
+    animation: pulse-dot 1.6s ease-in-out infinite;
+  }
+  @keyframes pulse-dot {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(22,163,74,0.45); }
+    50% { box-shadow: 0 0 0 5px rgba(22,163,74,0); }
+  }
+  .tracking-source { font-size: 12px; color: var(--text-soft); }
+  .tracking-checked { font-size: 12px; color: var(--text-soft); }
+
+  .tracker-stepper { display: flex; align-items: center; margin-top: 6px; }
+  .tracker-step { flex: 1; text-align: center; position: relative; }
+  .tracker-step .dot {
+    width: 14px; height: 14px; border-radius: 50%; background: #dde1e6; margin: 0 auto 8px;
+    border: 3px solid #fff; box-shadow: 0 0 0 1px #dde1e6; position: relative; z-index: 2;
+  }
+  .tracker-step.done .dot { background: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  .tracker-step.current .dot { background: #16a34a; box-shadow: 0 0 0 1px #16a34a; }
+  .tracker-step .line {
+    position: absolute; top: 6px; left: -50%; width: 100%; height: 2px; background: #dde1e6; z-index: 1;
+  }
+  .tracker-step:first-child .line { display: none; }
+  .tracker-step.done .line, .tracker-step.current .line { background: var(--accent); }
+  .tracker-step .label { font-size: 11.5px; color: var(--text-soft); font-weight: 600; }
+  .tracker-step.current .label { color: #16a34a; }
+  .tracker-step.done .label { color: var(--text); }
+
+  .chip-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+  .container-chip {
+    display: inline-flex; align-items: center; gap: 7px; background: #f4f5f7; border: 1.5px solid transparent;
+    border-radius: 20px; padding: 6px 12px 6px 10px; cursor: pointer; font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px; color: var(--text-soft);
+  }
+  .container-chip .stage-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .container-chip.active { background: #eaf2fb; border-color: var(--accent); color: var(--text); font-weight: 600; }
+  .container-chip:hover { border-color: #bcd6f2; }
+
+  @keyframes row-flash {
+    0% { background-color: #fff7db; }
+    100% { background-color: transparent; }
+  }
+  tr.row-highlight td { animation: row-flash 1.6s ease-out; }
+
+  .toast {
+    position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px);
+    background: var(--header-dark); color: #fff; padding: 10px 18px; border-radius: 8px; font-size: 13px;
+    opacity: 0; pointer-events: none; transition: opacity 0.2s ease, transform 0.2s ease;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* ── Clean dialog modal (Word/Excel style) ── */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(15,20,30,0.45); display: none;
+    align-items: center; justify-content: center; z-index: 1200; padding: 20px;
+  }
+  .modal-overlay.show { display: flex; }
+  .modal-box {
+    background: #fff; border-radius: 10px; width: 100%; max-width: 380px;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.35); overflow: hidden;
+  }
+  .modal-box.wide { max-width: 560px; }
+  .modal-title-bar {
+    background: var(--header); color: #fff; padding: 14px 18px; font-size: 14.5px; font-weight: 700;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .modal-body { padding: 20px 22px; font-size: 13.5px; color: var(--text); line-height: 1.5; }
+  .modal-actions { padding: 14px 22px 20px; display: flex; justify-content: flex-end; gap: 10px; }
+  .modal-actions .btn { min-width: 84px; }
+  .btn-secondary { background: #fff; border: 1.5px solid var(--input-border); color: var(--text); }
+
+  /* ── Company Setup panel ── */
+  .setup-tabs { display: flex; gap: 6px; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
+  .setup-tab {
+    padding: 9px 14px; font-size: 12.5px; font-weight: 600; color: var(--text-soft); cursor: pointer;
+    border-bottom: 2px solid transparent; margin-bottom: -1px;
+  }
+  .setup-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .setup-add-row { display: flex; gap: 8px; margin-bottom: 14px; }
+  .setup-add-row input {
+    flex: 1; height: 36px; border-radius: 6px; border: 1.5px solid var(--input-border); padding: 0 10px; font-size: 13px;
+  }
+  .setup-list { display: flex; flex-direction: column; gap: 6px; max-height: 260px; overflow-y: auto; }
+  .setup-list-item {
+    display: flex; align-items: center; justify-content: space-between; background: #f6f7f9;
+    border-radius: 6px; padding: 8px 10px 8px 12px; font-size: 13px;
+  }
+  .setup-list-item button {
+    background: #fee2e2; color: #dc2626; border: none; border-radius: 5px; width: 26px; height: 26px; cursor: pointer;
+  }
+</style>
+</head>
+<body>
+
+<div id="login-screen">
+  <div class="login-card">
+    <h2>Geofit Ops Hub</h2>
+    <div class="sub">Staff sign in</div>
+    <div class="login-field"><label>Email</label><input type="text" id="login-email" placeholder="name@geofit.co.za"></div>
+    <div class="login-field"><label>Password</label><input type="password" id="login-pw" placeholder="••••••••"></div>
+    <button class="login-btn" id="login-submit-btn" onclick="handleStaffLogin()">Sign In</button>
+    <div class="login-error" id="login-error-msg"></div>
+  </div>
+</div>
+
+<div id="app-shell">
+
+<div class="sidebar">
+  <div class="sidebar-logo">GEOFIT LOGISTICS HUB</div>
+  <div class="sidebar-nav">
+    <div class="sidebar-link"><span class="ic">&#9635;</span> Dashboard</div>
+    <div class="sidebar-link active"><span class="ic">&#128196;</span> Shipment Registration</div>
+    <div class="sidebar-link"><span class="ic">&#128202;</span> Reports</div>
+    <div class="sidebar-link" onclick="handleFinancialsClick()"><span class="ic">&#128176;</span> Financials</div>
+    <div class="sidebar-link" onclick="openCompanySetup()"><span class="ic">&#9881;</span> Company Setup</div>
+  </div>
+  <div class="sidebar-foot">
+    <div class="who"><strong id="staff-email">Operations</strong>Geofit Staff</div>
+    <button class="logout-btn" style="margin-bottom:6px;" onclick="openChangePassword()">Change Password</button>
+    <button class="logout-btn" onclick="handleStaffLogout()">Logout</button>
+  </div>
+</div>
+
+<div class="main-area">
+  <div style="padding:26px 28px 6px;">
+    <h1 style="margin:0; font-size:26px; font-weight:800; color:var(--header);">Welcome to Geofit Logistics Hub</h1>
+  </div>
+  <div class="topbar" style="border-top:1px solid var(--border);">
+    <input type="text" id="search-input" placeholder="Search by Container Number...">
+    <button class="btn btn-primary" style="margin-left:-4px;" onclick="searchContainer()">&#128269; Search</button>
+    <div class="topbar-spacer"></div>
+    <button class="btn btn-primary" onclick="addNewRecord()"><span class="btn-icon">&#128203;</span>Add New Record</button>
+    <button class="btn btn-primary" onclick="handleSaveUpdate()"><span class="btn-icon">&#128190;</span>Save and Update</button>
+    <button class="btn btn-primary" onclick="showConfirm('Clear All', 'Are you sure you want to clear all fields on this file? Unsaved changes will be lost.', 'Clear All', function(){ showToast('Cleared'); })"><span class="btn-icon">&#10006;</span>Clear All</button>
+  </div>
+
+  <div class="page-pad">
+  <div class="wrap">
+
+  <div class="page-head"><h2>Shipment Details</h2></div>
+  <div class="file-strip"><strong>FILE:</strong> <span id="file-strip-num">— no file loaded —</span> &nbsp;|&nbsp; <strong>Status:</strong> <span class="status-chip-badge" id="file-strip-status">NEW</span></div>
+
+  <div class="tracking-panel show" id="tracking-panel">
+    <div class="chip-row" id="chip-row-containers"></div>
+
+    <div class="tracking-head">
+      <div class="tracking-left">
+        <span class="tracking-container-num" id="tk-container-num">—</span>
+        <span class="live-badge"><span class="live-dot"></span>LIVE</span>
+      </div>
+      <div>
+        <span class="tracking-source" id="tk-source">Source: —</span>
+        &nbsp;·&nbsp;
+        <span class="tracking-checked" id="tk-checked">Checked —</span>
+      </div>
+    </div>
+    <div class="tracker-stepper">
+      <div class="tracker-step" id="step-0"><div class="line"></div><div class="dot"></div><div class="label">Inbound</div></div>
+      <div class="tracker-step" id="step-1"><div class="line"></div><div class="dot"></div><div class="label">Yard</div></div>
+      <div class="tracker-step" id="step-2"><div class="line"></div><div class="dot"></div><div class="label">EC/Out</div></div>
+      <div class="tracker-step" id="step-3"><div class="line"></div><div class="dot"></div><div class="label">Departed</div></div>
+    </div>
+  </div>
+
+  <div class="panel accent-top">
+    <div class="panel-title"><span class="bar"></span>Shipment Details</div>
+    <div class="detail-cards">
+      <div class="detail-card">
+        <div class="field"><label>Geofit File Number</label><input id="f-file-number" value="" disabled></div>
+        <div class="field"><label>Instruction Date</label><input type="date" id="f-instruction-date"></div>
+        <div class="field"><label>Transporter</label>
+          <select id="dd-transporter"><option>Naledi</option><option>Umzimkhulu</option><option>Bengu</option></select>
+        </div>
+      </div>
+
+      <div class="detail-card">
+        <div class="field"><label>Client Name</label>
+          <select id="dd-client"><option>South Continent</option><option>Other Client</option></select>
+        </div>
+        <div class="field"><label>Client File Number</label><input id="f-client-file-number" placeholder="—"></div>
+        <div class="field"><label>Vessel Name</label><input id="f-vessel-name" placeholder="—"></div>
+        <div class="field"><label>Vessel Operator</label><input id="f-vessel-operator" placeholder="—"></div>
+      </div>
+
+      <div class="detail-card">
+        <div class="field"><label>Traffic</label>
+          <select id="f-traffic"><option>IMPORT</option><option>EXPORT</option></select>
+        </div>
+        <div class="field"><label>ETA</label><input type="date" id="f-eta"></div>
+        <div class="field"><label>Terminal</label>
+          <select id="dd-terminal"><option>Durban Gateway Terminal</option><option>Point DRT</option><option>New Pier 1</option></select>
+        </div>
+        <div class="field"><label>Booking Reference</label><input id="f-booking-ref" placeholder="—"></div>
+        <div class="field"><label>Stack Dates</label><input type="date" id="f-stack-date"></div>
+      </div>
+
+      <div class="detail-card">
+        <div class="field"><label>Commodity</label><input id="f-commodity" placeholder="—"></div>
+        <div class="field"><label>Empty Depot</label><input id="f-empty-depot" placeholder="—"></div>
+      </div>
+    </div>
+
+    <div class="section-gap"></div>
+
+    <div class="field">
+      <label>Delivery / Packing Address</label>
+      <select id="dd-address"><option>GHM Archery Road Clairwood Durban</option></select>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="containers-head">
+      <div class="panel-title" style="margin-bottom:0; padding-bottom:0; border-bottom:none;"><span class="bar"></span>Containers</div>
+      <span class="hint">Current Status is what sends to WhatsApp — each container has its own status, remarks &amp; state</span>
+    </div>
+
+    <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:24px;"></th>
+          <th style="width:128px;">Container Number</th>
+          <th style="width:52px;">Size</th>
+          <th style="width:72px;">Gross Wt</th>
+          <th style="width:188px;">Current Status</th>
+          <th style="width:158px;">Trans Remarks</th>
+          <th style="width:100px;">Container Status</th>
+          <th style="width:68px;">WhatsApp</th>
+          <th style="width:32px;"></th>
+        </tr>
+      </thead>
+      <tbody id="container-rows"></tbody>
+    </table>
+    </div>
+
+    <div style="margin-top:14px;">
+      <button class="add-container-btn" onclick="addContainer()">+ Add Container</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-title"><span class="bar"></span>Financials &amp; Broadcast</div>
+    <div class="field rate-box">
+      <label>Agreed Rate (File Level)</label>
+      <input id="f-rate" placeholder="e.g. R2700.00 / 12m">
+    </div>
+
+    <div class="broadcast-card">
+      <div class="broadcast-head">
+        <h3>Broadcast Update</h3>
+        <span id="chip-count">3 of 10 numbers</span>
+      </div>
+      <div class="num-chip-row" id="chip-row">
+        <span class="num-chip">082 555 0142 <button onclick="this.parentElement.remove(); updateChipCount()">&times;</button></span>
+        <span class="num-chip">071 884 5635 <button onclick="this.parentElement.remove(); updateChipCount()">&times;</button></span>
+        <span class="num-chip">083 220 9981 <button onclick="this.parentElement.remove(); updateChipCount()">&times;</button></span>
+      </div>
+      <div class="broadcast-add">
+        <input type="text" id="new-number" placeholder="Add a number, e.g. 082 123 4567">
+        <button class="btn btn-primary" onclick="addNumber()">Add</button>
+      </div>
+      <button class="btn copy-msg-btn" onclick="copyBroadcastMessage()">Copy Update for Broadcast List</button>
+      <div style="font-size:11.5px; color:var(--text-soft); margin-top:10px; line-height:1.5;">
+        Copies the update as text — paste it into your WhatsApp Broadcast List (set up once in the WhatsApp app) to reach everyone above in one paste. Fully automatic one-click sending to all numbers is a later phase.
+      </div>
+    </div>
+
+    <div class="bottom-actions">
+      <button class="btn">Customer Tracking</button>
+      <button class="btn">Trans Open Report</button>
+      <button class="btn">Internal Report</button>
+      <button class="btn">Transport Instructions</button>
+    </div>
+  </div>
+  </div>
+  </div>
+</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="modal-overlay" id="confirm-overlay">
+  <div class="modal-box">
+    <div class="modal-title-bar" id="confirm-title">Geofit Logistics Hub</div>
+    <div class="modal-body" id="confirm-body"></div>
+    <div class="modal-actions" id="confirm-actions"></div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="setup-overlay">
+  <div class="modal-box wide">
+    <div class="modal-title-bar">&#9881; Company Setup</div>
+    <div class="modal-body">
+      <div class="setup-tabs" id="setup-tabs"></div>
+      <div class="setup-add-row">
+        <input type="text" id="setup-add-input" placeholder="Add new...">
+        <button class="btn btn-primary" onclick="setupAddItem()">Add</button>
+      </div>
+      <div class="setup-list" id="setup-list"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="closeModal('setup-overlay')">Done</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="pw-overlay">
+  <div class="modal-box">
+    <div class="modal-title-bar">&#128274; Change Password</div>
+    <div class="modal-body">
+      <div class="login-field"><label>New Password</label><input type="password" id="pw-new" placeholder="At least 6 characters"></div>
+      <div class="login-field" style="margin-bottom:0;"><label>Confirm New Password</label><input type="password" id="pw-confirm" placeholder="Re-enter new password"></div>
+      <div class="login-error" id="pw-error"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-secondary" onclick="closeModal('pw-overlay')">Cancel</button>
+      <button class="btn btn-primary" id="pw-save-btn" onclick="handleChangePassword()">Save Password</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+  const SUPABASE_URL = "https://ffkcukglohdifxcvrafz.supabase.co";
+  const SUPABASE_KEY = "sb_publishable_AfKi7sWGCiuh3Jx_Mw1BHg_LWmXgAQQ";
+  const sbClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  let isSuperUser = false;
+  let currentFileId = null;
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 1800);
+  }
+
+  /* ── Login ── */
+  function handleStaffLogin() {
+    const email = document.getElementById('login-email').value.trim();
+    const pw = document.getElementById('login-pw').value.trim();
+    const errDiv = document.getElementById('login-error-msg');
+    const btn = document.getElementById('login-submit-btn');
+    errDiv.style.display = 'none';
+    if (!email || !pw) { errDiv.textContent = 'Please enter both email and password.'; errDiv.style.display = 'block'; return; }
+    btn.disabled = true;
+    btn.textContent = 'Signing in...';
+    sbClient.auth.signInWithPassword({ email: email, password: pw }).then(function(result) {
+      btn.disabled = false;
+      btn.textContent = 'Sign In';
+      if (result.error) {
+        errDiv.textContent = result.error.message || 'Invalid email or password.';
+        errDiv.style.display = 'block';
+        return;
+      }
+      enterApp(result.data.user);
+    });
+  }
+
+  function handleStaffLogout() {
+    sbClient.auth.signOut().then(function() {
+      document.getElementById('app-shell').classList.remove('show');
+      document.getElementById('login-screen').style.display = 'flex';
+      document.getElementById('login-email').value = '';
+      document.getElementById('login-pw').value = '';
+    });
+  }
+
+  function enterApp(user) {
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app-shell').classList.add('show');
+    document.getElementById('staff-email').textContent = user.email;
+    sbClient.from('staff_profiles').select('is_super_user, full_name').eq('id', user.id).single()
+      .then(function(res) {
+        isSuperUser = !!(res.data && res.data.is_super_user);
+        if (res.data && res.data.full_name) document.getElementById('staff-email').textContent = res.data.full_name;
+      });
+    loadDropdownData();
+  }
+
+  sbClient.auth.getSession().then(function(result) {
+    if (result.data.session) enterApp(result.data.session.user);
+  });
+
+  /* ── Modal system ── */
+  function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+
+  function showConfirm(title, message, confirmLabel, onConfirm) {
+    document.getElementById('confirm-title').textContent = title;
+    document.getElementById('confirm-body').textContent = message;
+    const actions = document.getElementById('confirm-actions');
+    actions.innerHTML = '';
+    const cancelBtn = document.createElement('button');
+    cancelBtn.className = 'btn btn-secondary';
+    cancelBtn.textContent = 'Cancel';
+    cancelBtn.onclick = function() { closeModal('confirm-overlay'); };
+    const okBtn = document.createElement('button');
+    okBtn.className = 'btn btn-primary';
+    okBtn.textContent = confirmLabel;
+    okBtn.onclick = function() { closeModal('confirm-overlay'); onConfirm(); };
+    actions.appendChild(cancelBtn);
+    actions.appendChild(okBtn);
+    document.getElementById('confirm-overlay').classList.add('show');
+  }
+
+  function showAlert(title, message) {
+    document.getElementById('confirm-title').textContent = title;
+    document.getElementById('confirm-body').textContent = message;
+    const actions = document.getElementById('confirm-actions');
+    actions.innerHTML = '';
+    const okBtn = document.createElement('button');
+    okBtn.className = 'btn btn-primary';
+    okBtn.textContent = 'OK';
+    okBtn.onclick = function() { closeModal('confirm-overlay'); };
+    actions.appendChild(okBtn);
+    document.getElementById('confirm-overlay').classList.add('show');
+  }
+
+  function openChangePassword() {
+    document.getElementById('pw-new').value = '';
+    document.getElementById('pw-confirm').value = '';
+    document.getElementById('pw-error').style.display = 'none';
+    document.getElementById('pw-overlay').classList.add('show');
+  }
+
+  function handleChangePassword() {
+    const pw = document.getElementById('pw-new').value;
+    const confirm = document.getElementById('pw-confirm').value;
+    const errDiv = document.getElementById('pw-error');
+    errDiv.style.display = 'none';
+    if (pw.length < 6) { errDiv.textContent = 'Password must be at least 6 characters.'; errDiv.style.display = 'block'; return; }
+    if (pw !== confirm) { errDiv.textContent = 'Passwords do not match.'; errDiv.style.display = 'block'; return; }
+    const btn = document.getElementById('pw-save-btn');
+    btn.disabled = true;
+    btn.textContent = 'Saving...';
+    sbClient.auth.updateUser({ password: pw }).then(function(res) {
+      btn.disabled = false;
+      btn.textContent = 'Save Password';
+      if (res.error) { errDiv.textContent = res.error.message; errDiv.style.display = 'block'; return; }
+      closeModal('pw-overlay');
+      showAlert('Password Changed', 'Your password has been updated. Use it next time you log in.');
+    });
+  }
+
+  function handleFinancialsClick() {
+    if (!isSuperUser) { showAlert('Access Restricted', 'Only super users have access to Financials.'); return; }
+    showToast('Opening Financials...');
+  }
+
+  /* ── Company Setup: real Supabase-backed lists ── */
+  const setupData = {
+    Transporters: { table: 'transporters', column: 'name', selectId: 'dd-transporter', items: [] },
+    Clients: { table: 'clients', column: 'name', selectId: 'dd-client', items: [] },
+    Terminals: { table: 'terminals', column: 'name', selectId: 'dd-terminal', items: [] },
+    Addresses: { table: 'delivery_addresses', column: 'address', selectId: 'dd-address', items: [] }
+  };
+  let setupActiveTab = 'Transporters';
+
+  function loadDropdownData() {
+    Object.keys(setupData).forEach(function(tabName) {
+      const cfg = setupData[tabName];
+      sbClient.from(cfg.table).select('id, ' + cfg.column).order(cfg.column).then(function(res) {
+        if (res.error) { console.error(res.error); return; }
+        cfg.items = res.data;
+        rebuildDropdown(tabName);
+        if (tabName === setupActiveTab) renderSetupList();
+      });
+    });
+  }
+
+  function rebuildDropdown(tabName) {
+    const cfg = setupData[tabName];
+    const select = document.getElementById(cfg.selectId);
+    if (!select) return;
+    const current = select.value;
+    select.innerHTML = '';
+    cfg.items.forEach(function(row) {
+      const opt = document.createElement('option');
+      opt.textContent = row[cfg.column];
+      select.appendChild(opt);
+    });
+    const values = cfg.items.map(function(r) { return r[cfg.column]; });
+    if (values.includes(current)) select.value = current;
+  }
+
+  function openCompanySetup() {
+    if (!isSuperUser) { showAlert('Access Restricted', 'Only super users can access Company Setup.'); return; }
+    renderSetupTabs();
+    renderSetupList();
+    document.getElementById('setup-overlay').classList.add('show');
+  }
+
+  function renderSetupTabs() {
+    const tabRow = document.getElementById('setup-tabs');
+    tabRow.innerHTML = '';
+    Object.keys(setupData).forEach(function(name) {
+      const tab = document.createElement('div');
+      tab.className = 'setup-tab' + (name === setupActiveTab ? ' active' : '');
+      tab.textContent = name;
+      tab.onclick = function() { setupActiveTab = name; renderSetupTabs(); renderSetupList(); };
+      tabRow.appendChild(tab);
+    });
+  }
+
+  function renderSetupList() {
+    const list = document.getElementById('setup-list');
+    list.innerHTML = '';
+    const cfg = setupData[setupActiveTab];
+    cfg.items.forEach(function(row) {
+      const label = row[cfg.column];
+      const item = document.createElement('div');
+      item.className = 'setup-list-item';
+      item.innerHTML = '<span>' + label + '</span>';
+      const delBtn = document.createElement('button');
+      delBtn.innerHTML = '&times;';
+      delBtn.onclick = function() {
+        showConfirm('Remove Entry', 'Remove "' + label + '" from ' + setupActiveTab + '?', 'Remove', function() {
+          sbClient.from(cfg.table).delete().eq('id', row.id).then(function(res) {
+            if (res.error) { showAlert('Could Not Remove', res.error.message); return; }
+            loadDropdownData();
+            showToast('Removed');
+          });
+        });
+      };
+      item.appendChild(delBtn);
+      list.appendChild(item);
+    });
+  }
+
+  function setupAddItem() {
+    const input = document.getElementById('setup-add-input');
+    const val = input.value.trim();
+    if (!val) return;
+    const cfg = setupData[setupActiveTab];
+    const row = {};
+    row[cfg.column] = val;
+    sbClient.from(cfg.table).insert(row).then(function(res) {
+      if (res.error) { showAlert('Could Not Add', res.error.message); return; }
+      input.value = '';
+      loadDropdownData();
+      showToast('Added');
+    });
+  }
+
+  /* ── File-level: new / save / search ── */
+  function clearFileForm() {
+    currentFileId = null;
+    document.getElementById('f-file-number').value = '';
+    document.getElementById('file-strip-num').textContent = '— no file loaded —';
+    document.getElementById('file-strip-status').textContent = 'NEW';
+    ['f-instruction-date','f-client-file-number','f-vessel-name','f-vessel-operator',
+     'f-eta','f-booking-ref','f-stack-date','f-commodity','f-empty-depot','f-rate'
+    ].forEach(function(id) { document.getElementById(id).value = ''; });
+    document.getElementById('container-rows').innerHTML = '';
+    renderChips();
+    renderDetail();
+  }
+
+  function addNewRecord() {
+    sbClient.from('shipment_files').insert({}).select().single().then(function(res) {
+      if (res.error) { showAlert('Could Not Create File', res.error.message); return; }
+      clearFileForm();
+      currentFileId = res.data.id;
+      document.getElementById('f-file-number').value = res.data.file_number;
+      document.getElementById('file-strip-num').textContent = res.data.file_number;
+      document.getElementById('file-strip-status').textContent = 'NEW';
+      showToast('New file ' + res.data.file_number + ' started');
+    });
+  }
+
+  function populateFileForm(file) {
+    currentFileId = file.id;
+    document.getElementById('f-file-number').value = file.file_number || '';
+    document.getElementById('file-strip-num').textContent = file.file_number || '—';
+    document.getElementById('file-strip-status').textContent = 'LOADED';
+    document.getElementById('f-instruction-date').value = file.instruction_date || '';
+    document.getElementById('dd-transporter').value = file.transporter || '';
+    document.getElementById('dd-client').value = file.client_name || '';
+    document.getElementById('f-client-file-number').value = file.client_file_number || '';
+    document.getElementById('f-vessel-name').value = file.vessel_name || '';
+    document.getElementById('f-vessel-operator').value = file.vessel_operator || '';
+    document.getElementById('f-traffic').value = file.traffic || 'IMPORT';
+    document.getElementById('f-eta').value = file.eta || '';
+    document.getElementById('dd-terminal').value = file.terminal || '';
+    document.getElementById('f-booking-ref').value = file.booking_reference || '';
+    document.getElementById('f-stack-date').value = file.stack_date || '';
+    document.getElementById('f-commodity').value = file.commodity || '';
+    document.getElementById('f-empty-depot').value = file.empty_depot || '';
+    document.getElementById('dd-address').value = file.delivery_address || '';
+    document.getElementById('f-rate').value = file.agreed_rate || '';
+  }
+
+  function searchContainer() {
+    const term = document.getElementById('search-input').value.trim();
+    if (!term) { showToast('Enter a container number to search'); return; }
+    sbClient.from('containers').select('file_id').ilike('container_number', term).limit(1).then(function(res) {
+      if (res.error || !res.data.length) { showAlert('Not Found', 'No file found for container ' + term + '.'); return; }
+      loadFile(res.data[0].file_id);
+    });
+  }
+
+  function loadFile(fileId) {
+    sbClient.from('shipment_files').select('*').eq('id', fileId).single().then(function(fileRes) {
+      if (fileRes.error) { showAlert('Could Not Load File', fileRes.error.message); return; }
+      populateFileForm(fileRes.data);
+      sbClient.from('containers').select('*').eq('file_id', fileId).order('created_at').then(function(cRes) {
+        document.getElementById('container-rows').innerHTML = '';
+        (cRes.data || []).forEach(function(c) { addContainer(c); });
+        showToast('File ' + fileRes.data.file_number + ' loaded');
+      });
+    });
+  }
+
+  function handleSaveUpdate() {
+    if (!currentFileId) { showAlert('No File Loaded', 'Click "Add New Record" to start a new file, or search for an existing container number first.'); return; }
+    const payload = {
+      instruction_date: document.getElementById('f-instruction-date').value || null,
+      transporter: document.getElementById('dd-transporter').value,
+      client_name: document.getElementById('dd-client').value,
+      client_file_number: document.getElementById('f-client-file-number').value,
+      vessel_name: document.getElementById('f-vessel-name').value,
+      vessel_operator: document.getElementById('f-vessel-operator').value,
+      traffic: document.getElementById('f-traffic').value,
+      eta: document.getElementById('f-eta').value || null,
+      terminal: document.getElementById('dd-terminal').value,
+      booking_reference: document.getElementById('f-booking-ref').value,
+      stack_date: document.getElementById('f-stack-date').value || null,
+      commodity: document.getElementById('f-commodity').value,
+      empty_depot: document.getElementById('f-empty-depot').value,
+      delivery_address: document.getElementById('dd-address').value,
+      agreed_rate: document.getElementById('f-rate').value,
+      updated_at: new Date().toISOString()
+    };
+    sbClient.from('shipment_files').update(payload).eq('id', currentFileId).then(function(res) {
+      if (res.error) { showAlert('Could Not Save File', res.error.message); return; }
+      saveAllContainers();
+    });
+  }
+
+  function saveAllContainers() {
+    const rows = getTrackedRows();
+    const promises = rows.map(function(row) {
+      const cells = row.querySelectorAll('td');
+      const dbId = row.dataset.dbId || null;
+      const record = {
+        file_id: currentFileId,
+        container_number: cells[1].querySelector('input').value,
+        container_size: cells[2].querySelector('input').value,
+        gross_weight: cells[3].querySelector('input').value,
+        current_status: cells[4].querySelectorAll('input')[0].value,
+        current_status_highlight: cells[4].querySelectorAll('input')[1].checked,
+        trans_remarks: cells[5].querySelectorAll('input')[0].value,
+        trans_remarks_highlight: cells[5].querySelectorAll('input')[1].checked,
+        status: row.querySelector('.status-pill').classList.contains('status-open') ? 'Open' : 'Closed'
+      };
+      if (dbId) {
+        return sbClient.from('containers').update(record).eq('id', dbId);
+      } else {
+        return sbClient.from('containers').insert(record).select().single().then(function(res) {
+          if (!res.error) { row.dataset.dbId = res.data.id; }
+          return res;
+        });
+      }
+    });
+    Promise.all(promises).then(function() {
+      showAlert('Geofit Logistics Hub', 'File saved successfully.');
+    });
+  }
+
+  /* ── Containers table ── */
+  function toggleStatus(btn) {
+    const isOpen = btn.classList.contains('status-open');
+    btn.classList.toggle('status-open', !isOpen);
+    btn.classList.toggle('status-closed', isOpen);
+    btn.innerHTML = isOpen ? '<span class="status-dot"></span> Closed' : '<span class="status-dot"></span> Open';
+  }
+
+  function addContainer(existing) {
+    const tbody = document.getElementById('container-rows');
+    const row = document.createElement('tr');
+    const num = existing ? existing.container_number : '';
+    const tempId = num || ('new-' + Date.now());
+    row.dataset.container = tempId;
+    row.dataset.stage = existing ? (existing.tracking_stage || 'Inbound') : 'Inbound';
+    row.dataset.source = existing ? (existing.tracking_source || 'Not yet tracked') : 'Not yet tracked';
+    row.dataset.checked = existing ? (existing.tracking_checked_at || '—') : '—';
+    if (existing) row.dataset.dbId = existing.id;
+    const statusClass = existing && existing.status === 'Closed' ? 'status-closed' : 'status-open';
+    const statusLabel = existing && existing.status === 'Closed' ? 'Closed' : 'Open';
+    row.innerHTML = `
+      <td>⚓</td>
+      <td><input placeholder="Container number" value="${existing ? existing.container_number || '' : ''}"></td>
+      <td><input placeholder="Size" value="${existing ? existing.container_size || '' : ''}"></td>
+      <td><input placeholder="Wt" value="${existing ? existing.gross_weight || '' : ''}"></td>
+      <td><div class="msg-cell"><input placeholder="Current status message" value="${existing ? existing.current_status || '' : ''}"><input type="checkbox" ${existing && existing.current_status_highlight ? 'checked' : ''} title="Bold blue in report"></div></td>
+      <td><div class="msg-cell"><input placeholder="Remarks" value="${existing ? existing.trans_remarks || '' : ''}"><input type="checkbox" ${existing && existing.trans_remarks_highlight ? 'checked' : ''} title="Bold blue in report"></div></td>
+      <td><button class="status-pill ${statusClass}" onclick="toggleStatus(this)"><span class="status-dot"></span> ${statusLabel}</button></td>
+      <td><button class="wa-btn" onclick="showToast('WhatsApp message sent')">Send</button></td>
+      <td><button class="del-btn" onclick="confirmDeleteContainer(this)">&times;</button></td>
+    `;
+    tbody.appendChild(row);
+    const numberInput = row.querySelector('td:nth-child(2) input');
+    numberInput.addEventListener('input', function() {
+      const wasActive = row.dataset.container === activeContainerNum;
+      row.dataset.container = this.value.trim() || tempId;
+      if (wasActive) activeContainerNum = row.dataset.container;
+      renderChips();
+    });
+    activeContainerNum = row.dataset.container;
+    renderChips();
+    renderDetail();
+  }
+
+  function confirmDeleteContainer(btn) {
+    const row = btn.closest('tr');
+    const num = row.querySelector('td:nth-child(2) input').value || 'this container';
+    showConfirm('Delete Container', 'Are you sure you want to delete ' + num + '? This cannot be undone.', 'Delete', function() {
+      const dbId = row.dataset.dbId;
+      if (dbId) {
+        sbClient.from('containers').delete().eq('id', dbId).then(function(res) {
+          if (res.error) { showAlert('Could Not Delete', res.error.message); return; }
+          removeContainerRow(btn);
+        });
+      } else {
+        removeContainerRow(btn);
+      }
+    });
+  }
+
+  function removeContainerRow(btn) {
+    const row = btn.closest('tr');
+    const wasActive = row.dataset.container === activeContainerNum;
+    row.remove();
+    if (wasActive) {
+      const remaining = getTrackedRows();
+      activeContainerNum = remaining.length ? remaining[0].dataset.container : '';
+    }
+    renderChips();
+    if (activeContainerNum) renderDetail();
+  }
+
+  /* ── Broadcast list (unchanged — local only for now) ── */
+  function updateChipCount() {
+    const count = document.getElementById('chip-row').children.length;
+    document.getElementById('chip-count').textContent = count + ' of 10 numbers';
+  }
+
+  function addNumber() {
+    const input = document.getElementById('new-number');
+    const val = input.value.trim();
+    const row = document.getElementById('chip-row');
+    if (!val) return;
+    if (row.children.length >= 10) { showToast('Limit of 10 numbers reached'); return; }
+    const chip = document.createElement('span');
+    chip.className = 'num-chip';
+    chip.innerHTML = val + ' <button onclick="this.parentElement.remove(); updateChipCount()">&times;</button>';
+    row.appendChild(chip);
+    input.value = '';
+    updateChipCount();
+  }
+
+  function copyBroadcastMessage() {
+    const firstRow = document.querySelector('#container-rows tr');
+    if (!firstRow) { showToast('No containers on this file yet'); return; }
+    const containerNum = firstRow.querySelector('td:nth-child(2) input').value;
+    const currentStatus = firstRow.querySelector('td:nth-child(5) input:not([type=checkbox])').value;
+    const fileNum = document.getElementById('f-file-number').value || '—';
+    const msg = "GEOFIT UPDATE\nFile: " + fileNum + "\nContainer: " + containerNum + "\nStatus: " + currentStatus;
+    navigator.clipboard.writeText(msg).then(() => showToast('Copied — paste into your Broadcast List'));
+  }
+
+  /* ── Live tracking chips/stepper, driven by the table rows ── */
+  const STAGES = ['Inbound', 'Yard', 'EC/Out', 'Departed'];
+  const STAGE_COLORS = { 'Inbound': '#3b82f6', 'Yard': '#f59e0b', 'EC/Out': '#8b5cf6', 'Departed': '#16a34a' };
+  let activeContainerNum = '';
+
+  function getTrackedRows() {
+    return Array.from(document.querySelectorAll('#container-rows tr[data-container]'));
+  }
+
+  function renderChips() {
+    const row = document.getElementById('chip-row-containers');
+    row.innerHTML = '';
+    const rows = getTrackedRows();
+    if (!rows.some(function(r) { return r.dataset.container === activeContainerNum; }) && rows.length) {
+      activeContainerNum = rows[0].dataset.container;
+    }
+    rows.forEach(function(r) {
+      const num = r.dataset.container;
+      const stage = r.dataset.stage || 'Inbound';
+      const chip = document.createElement('div');
+      chip.className = 'container-chip' + (num === activeContainerNum ? ' active' : '');
+      chip.onclick = function() { activeContainerNum = num; renderChips(); renderDetail(); jumpToContainerRow(num); };
+      chip.innerHTML = '<span class="stage-dot" style="background:' + STAGE_COLORS[stage] + '"></span>' + num;
+      row.appendChild(chip);
+    });
+  }
+
+  function renderDetail() {
+    const rows = getTrackedRows();
+    const row = rows.find(function(r) { return r.dataset.container === activeContainerNum; });
+    if (!row) {
+      document.getElementById('tk-container-num').textContent = '—';
+      document.getElementById('tk-source').textContent = 'Source: —';
+      document.getElementById('tk-checked').textContent = 'Checked —';
+      STAGES.forEach(function(label, i) { document.getElementById('step-' + i).classList.remove('done', 'current'); });
+      return;
+    }
+    const stage = row.dataset.stage || 'Inbound';
+    document.getElementById('tk-container-num').textContent = activeContainerNum;
+    document.getElementById('tk-source').textContent = 'Source: ' + (row.dataset.source || '—');
+    document.getElementById('tk-checked').textContent = 'Checked ' + (row.dataset.checked || '—');
+    const currentIdx = STAGES.indexOf(stage);
+    STAGES.forEach(function(label, i) {
+      const step = document.getElementById('step-' + i);
+      step.classList.remove('done', 'current');
+      if (i < currentIdx) step.classList.add('done');
+      if (i === currentIdx) step.classList.add('current');
+    });
+  }
+
+  function jumpToContainerRow(containerNum) {
+    const row = document.querySelector('#container-rows tr[data-container="' + containerNum + '"]');
+    if (!row) return;
+    row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    row.classList.remove('row-highlight');
+    void row.offsetWidth;
+    row.classList.add('row-highlight');
+    const statusInput = row.querySelector('td:nth-child(5) .msg-cell input:not([type=checkbox])');
+    if (statusInput) setTimeout(function() { statusInput.focus(); }, 350);
+  }
+
+  renderChips();
+  renderDetail();
+</script>
+</body>
+</html>
