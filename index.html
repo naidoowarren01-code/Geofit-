@@ -724,10 +724,10 @@
 
   /* ── Company Setup: real Supabase-backed lists ── */
   const setupData = {
-    Transporters: { table: 'transporters', column: 'name', selectId: 'dd-transporter', items: [] },
-    Clients: { table: 'clients', column: 'name', selectId: 'dd-client', items: [] },
-    Terminals: { table: 'terminals', column: 'name', selectId: 'dd-terminal', items: [] },
-    Addresses: { table: 'delivery_addresses', column: 'address', selectId: 'dd-address', items: [] }
+    Transporters: { table: 'transporters', column: 'name', selectId: 'dd-transporter', items: [], singular: 'Transporter' },
+    Clients: { table: 'clients', column: 'name', selectId: 'dd-client', items: [], singular: 'Client' },
+    Terminals: { table: 'terminals', column: 'name', selectId: 'dd-terminal', items: [], singular: 'Terminal' },
+    Addresses: { table: 'delivery_addresses', column: 'address', selectId: 'dd-address', items: [], singular: 'Address' }
   };
   let setupActiveTab = 'Transporters';
 
@@ -749,6 +749,10 @@
     if (!select) return;
     const current = select.value;
     select.innerHTML = '';
+    const blankOpt = document.createElement('option');
+    blankOpt.value = '';
+    blankOpt.textContent = '— Select ' + cfg.singular + ' —';
+    select.appendChild(blankOpt);
     cfg.items.forEach(function(row) {
       const opt = document.createElement('option');
       opt.textContent = row[cfg.column];
