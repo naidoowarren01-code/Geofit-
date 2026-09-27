@@ -960,10 +960,21 @@
       showAlert('No File Loaded', 'Add or load a file before generating instructions.');
       return;
     }
+    if (!window.jspdf || !window.jspdf.jsPDF) {
+      showAlert('PDF Tool Not Loaded', 'The PDF library did not load (this can happen on restricted networks). Try refreshing the page, or try again on a different network/WiFi.');
+      return;
+    }
     handleSaveUpdate(true).then(function() {
-      buildInstructionsPDF();
-      showToast('Instructions PDF downloaded');
-    }).catch(function() { /* save already showed the error */ });
+      try {
+        buildInstructionsPDF();
+        showToast('Instructions PDF downloaded');
+      } catch (err) {
+        console.error('Generate Instructions failed:', err);
+        showAlert('Could Not Generate PDF', 'Something went wrong building the PDF: ' + err.message);
+      }
+    }).catch(function(err) {
+      if (err !== 'no-file') { console.error('Save before generating instructions failed:', err); }
+    });
   }
 
   function buildInstructionsPDF() {
