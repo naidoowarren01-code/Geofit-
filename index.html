@@ -1128,7 +1128,7 @@
         return lines;
       });
       const rowH = maxLines * LINE_H + CELL_PAD * 2 - LINE_H + 2;
-      if (y + rowH > 272) {
+      if (y + rowH > 258) {
         doc.addPage();
         y = 18;
       }
@@ -1156,23 +1156,23 @@
     drawTableRow(doc, ['Container Number', 'Size', 'Gross Weight', 'Trans Remarks'], true, false);
     tableBody.forEach(function(r, i) { drawTableRow(doc, r, false, i % 2 === 1); });
 
-    /* ── Disclaimer ── */
-    y += 6;
+    /* ── Fixed footer on every page: disclaimer + company line ── */
     const disclaimerText = 'DISCLAIMER: By accepting these instructions, the transporter confirms valid GIT and Carriers Liability Cover of at least R2 000 000.00 including ' +
       'container replacement. Risk passes to the transporter at loading and Geofit PTY LTD is held harmless for any loss, damage, or delay thereafter. The ' +
       'transporter is responsible for strict compliance with all instructions.';
     const disclaimerLines = doc.splitTextToSize(disclaimerText, RIGHT_EDGE - MARGIN);
-    if (y + disclaimerLines.length * 3.2 > 278) { doc.addPage(); y = 18; }
-    doc.setFontSize(6.5); doc.setFont(undefined, 'normal'); doc.setTextColor(TEXT_SOFT[0], TEXT_SOFT[1], TEXT_SOFT[2]);
-    doc.text(disclaimerLines, MARGIN, y);
+    const DISCLAIMER_Y = 279 - (disclaimerLines.length - 1) * 3;
 
-    /* ── Footer on every page ── */
     const pageCount = doc.internal.getNumberOfPages();
     for (let i = 1; i <= pageCount; i++) {
       doc.setPage(i);
-      doc.setFontSize(7.5); doc.setTextColor(TEXT_SOFT[0], TEXT_SOFT[1], TEXT_SOFT[2]);
-      doc.text('GEOFIT PTY LTD  ·  Tel: 071 884 5635  ·  info@geofit.co.za  ·  www.geofit.co.za', MARGIN, 290);
-      doc.text('Page ' + i + ' of ' + pageCount, RIGHT_EDGE, 290, { align: 'right' });
+      doc.setDrawColor(BORDER[0], BORDER[1], BORDER[2]); doc.setLineWidth(0.2);
+      doc.line(MARGIN, DISCLAIMER_Y - 4, RIGHT_EDGE, DISCLAIMER_Y - 4);
+      doc.setFontSize(6.5); doc.setFont(undefined, 'normal'); doc.setTextColor(TEXT_SOFT[0], TEXT_SOFT[1], TEXT_SOFT[2]);
+      doc.text(disclaimerLines, MARGIN, DISCLAIMER_Y);
+      doc.setFontSize(7.5);
+      doc.text('GEOFIT PTY LTD  ·  Tel: 071 884 5635  ·  info@geofit.co.za  ·  www.geofit.co.za', MARGIN, 291);
+      doc.text('Page ' + i + ' of ' + pageCount, RIGHT_EDGE, 291, { align: 'right' });
     }
 
     const transporterName = v('dd-transporter') || 'Transporter';
