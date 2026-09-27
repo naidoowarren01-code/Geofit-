@@ -981,7 +981,7 @@
     const doc = new jsPDFCtor();
     const PAGE_W = 210, MARGIN = 14, RIGHT_EDGE = PAGE_W - MARGIN;
     const NAVY = [15, 42, 74], GRAY_FILL = [242, 244, 246], BORDER = [200, 205, 212], TEXT_SOFT = [100, 108, 118];
-    const SIDEBAR_X = 148, SIDEBAR_W = RIGHT_EDGE - SIDEBAR_X, MAIN_W = SIDEBAR_X - MARGIN - 6;
+    const SIDEBAR_X = 132, SIDEBAR_W = RIGHT_EDGE - SIDEBAR_X, MAIN_W = SIDEBAR_X - MARGIN - 8;
 
     const v = function(id) { const el = document.getElementById(id); return el ? el.value : ''; };
     const dash = function(s) { return s && String(s).trim() ? s : '—'; };
@@ -1033,20 +1033,30 @@
       ['Booking Reference', bookingRef], ['Stack Date', stackDate],
       ['Vessel Name', vesselName], ['Vessel Operator', vesselOperator]
     ];
-    const sideRowH = 12.5;
-    const sidebarH = sideRows.length * sideRowH + 6;
+    const SIDE_PAD = 6, SIDE_LABEL_GAP = 6, SIDE_LINE_H = 5, SIDE_ROW_GAP = 6;
+    doc.setFontSize(10.5);
+    let sidebarH = SIDE_PAD;
+    const sideRowHeights = sideRows.map(function(pair) {
+      const lines = doc.splitTextToSize(pair[1], SIDEBAR_W - 10);
+      const h = SIDE_LABEL_GAP + lines.length * SIDE_LINE_H + SIDE_ROW_GAP;
+      sidebarH += h;
+      return h;
+    });
     doc.setFillColor(GRAY_FILL[0], GRAY_FILL[1], GRAY_FILL[2]);
     doc.rect(SIDEBAR_X, bodyTop, SIDEBAR_W, sidebarH, 'F');
-    let sy = bodyTop + 8;
-    sideRows.forEach(function(pair) {
+    let sy = bodyTop + SIDE_PAD + 3;
+    sideRows.forEach(function(pair, i) {
       doc.setFontSize(8); doc.setFont(undefined, 'bold'); doc.setTextColor(TEXT_SOFT[0], TEXT_SOFT[1], TEXT_SOFT[2]);
-      doc.text(pair[0].toUpperCase(), SIDEBAR_X + 4, sy);
+      doc.text(pair[0].toUpperCase(), SIDEBAR_X + 5, sy);
       doc.setFontSize(10.5); doc.setFont(undefined, 'normal'); doc.setTextColor(0, 0, 0);
-      const lines = doc.splitTextToSize(pair[1], SIDEBAR_W - 8);
-      doc.text(lines, SIDEBAR_X + 4, sy + 5);
-      doc.setDrawColor(BORDER[0], BORDER[1], BORDER[2]); doc.setLineWidth(0.2);
-      doc.line(SIDEBAR_X + 4, sy + 8, RIGHT_EDGE - 4, sy + 8);
-      sy += sideRowH;
+      const lines = doc.splitTextToSize(pair[1], SIDEBAR_W - 10);
+      doc.text(lines, SIDEBAR_X + 5, sy + SIDE_LABEL_GAP);
+      const rowH = sideRowHeights[i];
+      if (i < sideRows.length - 1) {
+        doc.setDrawColor(BORDER[0], BORDER[1], BORDER[2]); doc.setLineWidth(0.2);
+        doc.line(SIDEBAR_X + 5, sy + rowH - SIDE_ROW_GAP / 2, RIGHT_EDGE - 5, sy + rowH - SIDE_ROW_GAP / 2);
+      }
+      sy += rowH;
     });
 
     /* ── Left column: section bars ── */
@@ -1070,7 +1080,11 @@
 
     sectionBar('Transporter & Client');
     twoCol('Transporter', transporter, 'Client', client);
-    twoCol('Client File Number', clientFileNum, 'Commodity', commodity);
+    doc.setFontSize(8); doc.setFont(undefined, 'bold'); doc.setTextColor(TEXT_SOFT[0], TEXT_SOFT[1], TEXT_SOFT[2]);
+    doc.text('COMMODITY', MARGIN, ly);
+    doc.setFontSize(10.5); doc.setFont(undefined, 'normal'); doc.setTextColor(0, 0, 0);
+    doc.text(commodity, MARGIN, ly + 5.5);
+    ly += 12;
 
     ly += 2;
     sectionBar('Delivery / Packing Address');
