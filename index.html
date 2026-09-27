@@ -824,6 +824,7 @@
   /* ── File-level: new / save / search ── */
   function clearFileForm() {
     currentFileId = null;
+    document.getElementById('search-input').value = '';
     document.getElementById('f-file-number').value = '';
     document.getElementById('file-strip-num').textContent = '— no file loaded —';
     document.getElementById('file-strip-status').textContent = 'NEW';
@@ -1031,8 +1032,7 @@
     /* ── Right sidebar: key shipment facts ── */
     const sideRows = [
       ['Terminal', terminal], ['Traffic', traffic], ['ETA', eta],
-      ['Booking Reference', bookingRef], ['Stack Date', stackDate],
-      ['Vessel Name', vesselName], ['Vessel Operator', vesselOperator]
+      ['Booking Reference', bookingRef], ['Stack Date', stackDate]
     ];
     const SIDE_PAD = 6, SIDE_LABEL_GAP = 6, SIDE_LINE_H = 5, SIDE_ROW_GAP = 6;
     doc.setFontSize(10.5);
@@ -1078,14 +1078,17 @@
       doc.text(String(valueB), MARGIN + MAIN_W / 2, ly + 5.5);
       ly += 12;
     }
+    function singleField(label, value) {
+      doc.setFontSize(8); doc.setFont(undefined, 'bold'); doc.setTextColor(TEXT_SOFT[0], TEXT_SOFT[1], TEXT_SOFT[2]);
+      doc.text(label.toUpperCase(), MARGIN, ly);
+      doc.setFontSize(10.5); doc.setFont(undefined, 'normal'); doc.setTextColor(0, 0, 0);
+      doc.text(String(value), MARGIN, ly + 5.5);
+      ly += 12;
+    }
 
-    sectionBar('Transporter & Client');
-    twoCol('Transporter', transporter, 'Client', client);
-    doc.setFontSize(8); doc.setFont(undefined, 'bold'); doc.setTextColor(TEXT_SOFT[0], TEXT_SOFT[1], TEXT_SOFT[2]);
-    doc.text('COMMODITY', MARGIN, ly);
-    doc.setFontSize(10.5); doc.setFont(undefined, 'normal'); doc.setTextColor(0, 0, 0);
-    doc.text(commodity, MARGIN, ly + 5.5);
-    ly += 12;
+    sectionBar('Carrier Details');
+    twoCol('Transporter', transporter, 'Vessel Name', vesselName);
+    singleField('Vessel Operator', vesselOperator);
 
     ly += 2;
     sectionBar('Delivery / Packing Address');
@@ -1095,7 +1098,8 @@
     ly += addrLines.length * 5.5 + 6;
 
     sectionBar('Additional Information');
-    twoCol('Empty Depot', emptyDepot, 'Agreed Rate', rate);
+    twoCol('Commodity', commodity, 'Empty Depot', emptyDepot);
+    singleField('Agreed Rate', rate);
 
     y = Math.max(ly, bodyTop + sidebarH) + 4;
 
