@@ -595,7 +595,6 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf-autotable.min.js"></script>
 <script>
   const SUPABASE_URL = "https://ffkcukglohdifxcvrafz.supabase.co";
   const SUPABASE_KEY = "sb_publishable_AfKi7sWGCiuh3Jx_Mw1BHg_LWmXgAQQ";
@@ -1102,16 +1101,45 @@
       return [num, size, weight, remarks];
     }) : [['—', '—', '—', 'No containers added to this file']];
 
-    doc.autoTable({
-      startY: y,
-      margin: { left: MARGIN, right: MARGIN },
-      head: [['Container Number', 'Size', 'Gross Weight', 'Trans Remarks']],
-      body: tableBody,
-      styles: { fontSize: 9, cellPadding: 2.6, lineColor: BORDER, lineWidth: 0.2, textColor: [0, 0, 0] },
-      headStyles: { fillColor: NAVY, textColor: [255, 255, 255], fontStyle: 'bold' },
-      alternateRowStyles: { fillColor: [249, 250, 251] },
-      columnStyles: { 3: { cellWidth: 'auto' } }
-    });
+    const TABLE_W = RIGHT_EDGE - MARGIN;
+    const colW = [42, 22, 30, TABLE_W - 42 - 22 - 30];
+    const CELL_PAD = 2.4, LINE_H = 4.2;
+
+    function drawTableRow(doc, cellTexts, isHeader, altFill) {
+      let maxLines = 1;
+      const wrapped = cellTexts.map(function(txt, i) {
+        const lines = doc.splitTextToSize(String(txt), colW[i] - 4);
+        maxLines = Math.max(maxLines, lines.length);
+        return lines;
+      });
+      const rowH = maxLines * LINE_H + CELL_PAD * 2 - LINE_H + 2;
+      if (y + rowH > 272) {
+        doc.addPage();
+        y = 18;
+      }
+      if (isHeader) {
+        doc.setFillColor(NAVY[0], NAVY[1], NAVY[2]);
+        doc.rect(MARGIN, y, TABLE_W, rowH, 'F');
+      } else if (altFill) {
+        doc.setFillColor(249, 250, 251);
+        doc.rect(MARGIN, y, TABLE_W, rowH, 'F');
+      }
+      doc.setDrawColor(BORDER[0], BORDER[1], BORDER[2]); doc.setLineWidth(0.2);
+      doc.rect(MARGIN, y, TABLE_W, rowH);
+      let cx = MARGIN;
+      wrapped.forEach(function(lines, i) {
+        if (i > 0) doc.line(cx, y, cx, y + rowH);
+        doc.setFontSize(9);
+        doc.setFont(undefined, isHeader ? 'bold' : 'normal');
+        doc.setTextColor.apply(doc, isHeader ? [255, 255, 255] : [0, 0, 0]);
+        doc.text(lines, cx + 2, y + CELL_PAD + 3);
+        cx += colW[i];
+      });
+      y += rowH;
+    }
+
+    drawTableRow(doc, ['Container Number', 'Size', 'Gross Weight', 'Trans Remarks'], true, false);
+    tableBody.forEach(function(r, i) { drawTableRow(doc, r, false, i % 2 === 1); });
 
     /* ── Footer on every page ── */
     const pageCount = doc.internal.getNumberOfPages();
