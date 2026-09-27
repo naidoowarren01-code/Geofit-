@@ -1066,7 +1066,7 @@
       doc.setFillColor(GRAY_FILL[0], GRAY_FILL[1], GRAY_FILL[2]);
       doc.rect(MARGIN, ly, MAIN_W, h || 6.5, 'F');
       doc.setFontSize(9.5); doc.setFont(undefined, 'bold'); doc.setTextColor(0, 0, 0);
-      doc.text(title, MARGIN + 3, ly + (h ? h - 2 : 4.6));
+      doc.text(title, MARGIN, ly + (h ? h - 2 : 4.6));
       ly += (h || 6.5) + 5;
     }
     function twoCol(labelA, valueA, labelB, valueB) {
@@ -1107,7 +1107,7 @@
     doc.setFontSize(9.5); doc.setFont(undefined, 'bold'); doc.setTextColor(0, 0, 0);
     doc.setFillColor(GRAY_FILL[0], GRAY_FILL[1], GRAY_FILL[2]);
     doc.rect(MARGIN, y, RIGHT_EDGE - MARGIN, 6.5, 'F');
-    doc.text('Containers & Goods', MARGIN + 3, y + 4.6);
+    doc.text('Containers & Goods', MARGIN, y + 4.6);
     y += 10;
 
     const rows = getTrackedRows();
@@ -1164,6 +1164,7 @@
     const disclaimerText = 'DISCLAIMER: By accepting these instructions, the transporter confirms valid GIT and Carriers Liability Cover of at least R2 000 000.00 including ' +
       'container replacement. Risk passes to the transporter at loading and Geofit PTY LTD is held harmless for any loss, damage, or delay thereafter. The ' +
       'transporter is responsible for strict compliance with all instructions.';
+    doc.setFontSize(6.5); doc.setFont(undefined, 'normal');
     const disclaimerLines = doc.splitTextToSize(disclaimerText, RIGHT_EDGE - MARGIN);
     const DISCLAIMER_Y = 279 - (disclaimerLines.length - 1) * 3;
 
