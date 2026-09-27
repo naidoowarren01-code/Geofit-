@@ -1017,11 +1017,12 @@
     doc.text('File Number: ' + fileNum, MARGIN, y + 12.5);
 
     doc.setFontSize(15); doc.setFont(undefined, 'bold'); doc.setTextColor(NAVY[0], NAVY[1], NAVY[2]);
-    doc.text('GEOFIT LOGISTICS', RIGHT_EDGE, y, { align: 'right' });
+    doc.text('GEOFIT PTY LTD', RIGHT_EDGE, y, { align: 'right' });
     doc.setFontSize(8.5); doc.setFont(undefined, 'normal'); doc.setTextColor(TEXT_SOFT[0], TEXT_SOFT[1], TEXT_SOFT[2]);
-    doc.text('Geofit Pty Ltd  ·  Durban, South Africa', RIGHT_EDGE, y + 6, { align: 'right' });
+    doc.text('Tel: 071 884 5635  |  info@geofit.co.za', RIGHT_EDGE, y + 6, { align: 'right' });
+    doc.text('www.geofit.co.za', RIGHT_EDGE, y + 11, { align: 'right' });
 
-    y += 18;
+    y += 22;
     doc.setDrawColor(NAVY[0], NAVY[1], NAVY[2]); doc.setLineWidth(0.8);
     doc.line(MARGIN, y, RIGHT_EDGE, y);
     y += 8;
@@ -1155,12 +1156,22 @@
     drawTableRow(doc, ['Container Number', 'Size', 'Gross Weight', 'Trans Remarks'], true, false);
     tableBody.forEach(function(r, i) { drawTableRow(doc, r, false, i % 2 === 1); });
 
+    /* ── Disclaimer ── */
+    y += 6;
+    const disclaimerText = 'DISCLAIMER: By accepting these instructions, the transporter confirms valid GIT and Carriers Liability Cover of at least R2 000 000.00 including ' +
+      'container replacement. Risk passes to the transporter at loading and Geofit PTY LTD is held harmless for any loss, damage, or delay thereafter. The ' +
+      'transporter is responsible for strict compliance with all instructions.';
+    const disclaimerLines = doc.splitTextToSize(disclaimerText, RIGHT_EDGE - MARGIN);
+    if (y + disclaimerLines.length * 3.2 > 278) { doc.addPage(); y = 18; }
+    doc.setFontSize(6.5); doc.setFont(undefined, 'normal'); doc.setTextColor(TEXT_SOFT[0], TEXT_SOFT[1], TEXT_SOFT[2]);
+    doc.text(disclaimerLines, MARGIN, y);
+
     /* ── Footer on every page ── */
     const pageCount = doc.internal.getNumberOfPages();
     for (let i = 1; i <= pageCount; i++) {
       doc.setPage(i);
       doc.setFontSize(7.5); doc.setTextColor(TEXT_SOFT[0], TEXT_SOFT[1], TEXT_SOFT[2]);
-      doc.text('Geofit Pty Ltd  ·  Durban, South Africa  ·  Generated via Geofit Logistics Hub', MARGIN, 290);
+      doc.text('GEOFIT PTY LTD  ·  Tel: 071 884 5635  ·  info@geofit.co.za  ·  www.geofit.co.za', MARGIN, 290);
       doc.text('Page ' + i + ' of ' + pageCount, RIGHT_EDGE, 290, { align: 'right' });
     }
 
