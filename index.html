@@ -443,13 +443,13 @@
         <div class="field"><label>Geofit File Number</label><input id="f-file-number" value="" disabled></div>
         <div class="field"><label>Instruction Date</label><input type="date" id="f-instruction-date"></div>
         <div class="field"><label>Transporter</label>
-          <select id="dd-transporter"><option>Naledi</option><option>Umzimkhulu</option><option>Bengu</option></select>
+          <select id="dd-transporter"><option value="">— Select Transporter —</option><option>Naledi</option><option>Umzimkhulu</option><option>Bengu</option></select>
         </div>
       </div>
 
       <div class="detail-card">
         <div class="field"><label>Client Name</label>
-          <select id="dd-client"><option>South Continent</option><option>Other Client</option></select>
+          <select id="dd-client"><option value="">— Select Client —</option><option>South Continent</option><option>Other Client</option></select>
         </div>
         <div class="field"><label>Client File Number</label><input id="f-client-file-number" placeholder="—"></div>
         <div class="field"><label>Vessel Name</label><input id="f-vessel-name" placeholder="—"></div>
@@ -458,11 +458,11 @@
 
       <div class="detail-card">
         <div class="field"><label>Traffic</label>
-          <select id="f-traffic"><option>IMPORT</option><option>EXPORT</option></select>
+          <select id="f-traffic"><option value="">— Select Traffic —</option><option>IMPORT</option><option>EXPORT</option></select>
         </div>
         <div class="field"><label>ETA</label><input type="date" id="f-eta"></div>
         <div class="field"><label>Terminal</label>
-          <select id="dd-terminal"><option>Durban Gateway Terminal</option><option>Point DRT</option><option>New Pier 1</option></select>
+          <select id="dd-terminal"><option value="">— Select Terminal —</option><option>Durban Gateway Terminal</option><option>Point DRT</option><option>New Pier 1</option></select>
         </div>
         <div class="field"><label>Booking Reference</label><input id="f-booking-ref" placeholder="—"></div>
         <div class="field"><label>Stack Dates</label><input type="date" id="f-stack-date"></div>
@@ -478,7 +478,7 @@
 
     <div class="field">
       <label>Delivery / Packing Address</label>
-      <select id="dd-address"><option>GHM Archery Road Clairwood Durban</option></select>
+      <select id="dd-address"><option value="">— Select Address —</option><option>GHM Archery Road Clairwood Durban</option></select>
     </div>
   </div>
 
@@ -595,6 +595,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf-autotable.min.js"></script>
 <script>
   const SUPABASE_URL = "https://ffkcukglohdifxcvrafz.supabase.co";
   const SUPABASE_KEY = "sb_publishable_AfKi7sWGCiuh3Jx_Mw1BHg_LWmXgAQQ";
@@ -968,80 +969,151 @@
   function buildInstructionsPDF() {
     const jsPDFCtor = window.jspdf.jsPDF;
     const doc = new jsPDFCtor();
+    const PAGE_W = 210, MARGIN = 14, RIGHT_EDGE = PAGE_W - MARGIN;
+    const NAVY = [15, 42, 74], GRAY_FILL = [242, 244, 246], BORDER = [200, 205, 212], TEXT_SOFT = [100, 108, 118];
+    const SIDEBAR_X = 148, SIDEBAR_W = RIGHT_EDGE - SIDEBAR_X, MAIN_W = SIDEBAR_X - MARGIN - 6;
+
+    const v = function(id) { const el = document.getElementById(id); return el ? el.value : ''; };
+    const dash = function(s) { return s && String(s).trim() ? s : '—'; };
+    const fmtDate = function(iso) {
+      if (!iso) return '—';
+      const parts = iso.split('-');
+      return parts.length === 3 ? parts[2] + '/' + parts[1] + '/' + parts[0] : iso;
+    };
+
+    const fileNum = v('f-file-number') || '—';
+    const transporter = dash(v('dd-transporter'));
+    const client = dash(v('dd-client'));
+    const clientFileNum = dash(v('f-client-file-number'));
+    const vesselName = dash(v('f-vessel-name'));
+    const vesselOperator = dash(v('f-vessel-operator'));
+    const traffic = dash(v('f-traffic'));
+    const terminal = dash(v('dd-terminal'));
+    const eta = fmtDate(v('f-eta'));
+    const bookingRef = dash(v('f-booking-ref'));
+    const stackDate = fmtDate(v('f-stack-date'));
+    const commodity = dash(v('f-commodity'));
+    const emptyDepot = dash(v('f-empty-depot'));
+    const address = dash(v('dd-address'));
+    const rate = dash(v('f-rate'));
+    const instructionDate = fmtDate(v('f-instruction-date'));
+
+    /* ── Header ── */
     let y = 18;
-    const LABEL_X = 15, VALUE_X = 75, PAGE_BOTTOM = 275;
+    doc.setFontSize(19); doc.setTextColor(0, 0, 0); doc.setFont(undefined, 'bold');
+    doc.text('Transport Instruction', MARGIN, y);
+    doc.setFontSize(9); doc.setFont(undefined, 'normal'); doc.setTextColor(80, 80, 80);
+    doc.text('Date of Issue: ' + instructionDate, MARGIN, y + 7);
+    doc.text('File Number: ' + fileNum, MARGIN, y + 12.5);
 
-    function ensureRoom(rows) {
-      if (y + rows * 7 > PAGE_BOTTOM) { doc.addPage(); y = 18; }
+    doc.setFontSize(15); doc.setFont(undefined, 'bold'); doc.setTextColor(NAVY[0], NAVY[1], NAVY[2]);
+    doc.text('GEOFIT LOGISTICS', RIGHT_EDGE, y, { align: 'right' });
+    doc.setFontSize(8.5); doc.setFont(undefined, 'normal'); doc.setTextColor(TEXT_SOFT[0], TEXT_SOFT[1], TEXT_SOFT[2]);
+    doc.text('Geofit Pty Ltd  ·  Durban, South Africa', RIGHT_EDGE, y + 6, { align: 'right' });
+
+    y += 18;
+    doc.setDrawColor(NAVY[0], NAVY[1], NAVY[2]); doc.setLineWidth(0.8);
+    doc.line(MARGIN, y, RIGHT_EDGE, y);
+    y += 8;
+    const bodyTop = y;
+
+    /* ── Right sidebar: key shipment facts ── */
+    const sideRows = [
+      ['Terminal', terminal], ['Traffic', traffic], ['ETA', eta],
+      ['Booking Reference', bookingRef], ['Stack Date', stackDate],
+      ['Vessel Name', vesselName], ['Vessel Operator', vesselOperator]
+    ];
+    const sideRowH = 12.5;
+    const sidebarH = sideRows.length * sideRowH + 6;
+    doc.setFillColor(GRAY_FILL[0], GRAY_FILL[1], GRAY_FILL[2]);
+    doc.rect(SIDEBAR_X, bodyTop, SIDEBAR_W, sidebarH, 'F');
+    let sy = bodyTop + 8;
+    sideRows.forEach(function(pair) {
+      doc.setFontSize(8); doc.setFont(undefined, 'bold'); doc.setTextColor(TEXT_SOFT[0], TEXT_SOFT[1], TEXT_SOFT[2]);
+      doc.text(pair[0].toUpperCase(), SIDEBAR_X + 4, sy);
+      doc.setFontSize(10.5); doc.setFont(undefined, 'normal'); doc.setTextColor(0, 0, 0);
+      const lines = doc.splitTextToSize(pair[1], SIDEBAR_W - 8);
+      doc.text(lines, SIDEBAR_X + 4, sy + 5);
+      doc.setDrawColor(BORDER[0], BORDER[1], BORDER[2]); doc.setLineWidth(0.2);
+      doc.line(SIDEBAR_X + 4, sy + 8, RIGHT_EDGE - 4, sy + 8);
+      sy += sideRowH;
+    });
+
+    /* ── Left column: section bars ── */
+    let ly = bodyTop;
+    function sectionBar(title, h) {
+      doc.setFillColor(GRAY_FILL[0], GRAY_FILL[1], GRAY_FILL[2]);
+      doc.rect(MARGIN, ly, MAIN_W, h || 6.5, 'F');
+      doc.setFontSize(9.5); doc.setFont(undefined, 'bold'); doc.setTextColor(0, 0, 0);
+      doc.text(title, MARGIN + 3, ly + (h ? h - 2 : 4.6));
+      ly += (h || 6.5) + 5;
     }
-    function field(label, value) {
-      ensureRoom(1);
-      doc.setFont(undefined, 'bold'); doc.text(label + ':', LABEL_X, y);
-      doc.setFont(undefined, 'normal'); doc.text(String(value || '—'), VALUE_X, y);
-      y += 7;
+    function twoCol(labelA, valueA, labelB, valueB) {
+      doc.setFontSize(8); doc.setFont(undefined, 'bold'); doc.setTextColor(TEXT_SOFT[0], TEXT_SOFT[1], TEXT_SOFT[2]);
+      doc.text(labelA.toUpperCase(), MARGIN, ly);
+      doc.text(labelB.toUpperCase(), MARGIN + MAIN_W / 2, ly);
+      doc.setFontSize(10.5); doc.setFont(undefined, 'normal'); doc.setTextColor(0, 0, 0);
+      doc.text(String(valueA), MARGIN, ly + 5.5);
+      doc.text(String(valueB), MARGIN + MAIN_W / 2, ly + 5.5);
+      ly += 12;
     }
 
-    doc.setFontSize(16); doc.setFont(undefined, 'bold');
-    doc.text('Geofit Logistics — Shipping Instructions', LABEL_X, y);
+    sectionBar('Transporter & Client');
+    twoCol('Transporter', transporter, 'Client', client);
+    twoCol('Client File Number', clientFileNum, 'Commodity', commodity);
+
+    ly += 2;
+    sectionBar('Delivery / Packing Address');
+    doc.setFontSize(10.5); doc.setFont(undefined, 'normal'); doc.setTextColor(0, 0, 0);
+    const addrLines = doc.splitTextToSize(address, MAIN_W);
+    doc.text(addrLines, MARGIN, ly);
+    ly += addrLines.length * 5.5 + 6;
+
+    sectionBar('Additional Information');
+    twoCol('Empty Depot', emptyDepot, 'Agreed Rate', rate);
+
+    y = Math.max(ly, bodyTop + sidebarH) + 4;
+
+    /* ── Containers & Goods table ── */
+    doc.setFontSize(9.5); doc.setFont(undefined, 'bold'); doc.setTextColor(0, 0, 0);
+    doc.setFillColor(GRAY_FILL[0], GRAY_FILL[1], GRAY_FILL[2]);
+    doc.rect(MARGIN, y, RIGHT_EDGE - MARGIN, 6.5, 'F');
+    doc.text('Containers & Goods', MARGIN + 3, y + 4.6);
     y += 10;
-    doc.setFontSize(11);
-
-    field('Geofit File Number', document.getElementById('f-file-number').value);
-    field('Instruction Date', document.getElementById('f-instruction-date').value);
-    field('Transporter', document.getElementById('dd-transporter').value);
-    field('Traffic', document.getElementById('f-traffic').value);
-    field('Vessel Name', document.getElementById('f-vessel-name').value);
-    field('Vessel Operator', document.getElementById('f-vessel-operator').value);
-    field('Terminal', document.getElementById('dd-terminal').value);
-    field('ETA', document.getElementById('f-eta').value);
-    field('Booking Reference', document.getElementById('f-booking-ref').value);
-    field('Stack Date', document.getElementById('f-stack-date').value);
-    field('Commodity', document.getElementById('f-commodity').value);
-    field('Empty Depot', document.getElementById('f-empty-depot').value);
-
-    y += 2;
-    ensureRoom(2);
-    doc.setFont(undefined, 'bold'); doc.text('Delivery / Packing Address:', LABEL_X, y); y += 7;
-    doc.setFont(undefined, 'normal');
-    const addrLines = doc.splitTextToSize(document.getElementById('dd-address').value || '—', 180);
-    ensureRoom(addrLines.length);
-    doc.text(addrLines, LABEL_X, y);
-    y += addrLines.length * 7 + 4;
-
-    ensureRoom(2);
-    doc.setFontSize(13); doc.setFont(undefined, 'bold');
-    doc.text('Containers', LABEL_X, y); y += 8;
-    doc.setFontSize(11);
 
     const rows = getTrackedRows();
-    if (!rows.length) {
-      doc.setFont(undefined, 'normal');
-      doc.text('No containers added to this file.', LABEL_X, y);
-      y += 7;
-    }
-    rows.forEach(function(row) {
+    const tableBody = rows.length ? rows.map(function(row) {
       const cells = row.querySelectorAll('td');
       const num = cells[1].querySelector('input').value || '—';
       const size = cells[2].querySelector('input').value || '—';
       const weight = cells[3].querySelector('input').value || '—';
       const remarks = cells[5].querySelectorAll('input')[0].value || '—';
-      ensureRoom(2);
-      doc.setFont(undefined, 'bold'); doc.text('Container Number: ', LABEL_X, y);
-      doc.setFont(undefined, 'normal'); doc.text(num + '   Size: ' + size + '   Gross Weight: ' + weight, LABEL_X + 42, y);
-      y += 7;
-      const remarkLines = doc.splitTextToSize('Trans Remarks: ' + remarks, 180);
-      ensureRoom(remarkLines.length);
-      doc.text(remarkLines, LABEL_X, y);
-      y += remarkLines.length * 6 + 4;
+      return [num, size, weight, remarks];
+    }) : [['—', '—', '—', 'No containers added to this file']];
+
+    doc.autoTable({
+      startY: y,
+      margin: { left: MARGIN, right: MARGIN },
+      head: [['Container Number', 'Size', 'Gross Weight', 'Trans Remarks']],
+      body: tableBody,
+      styles: { fontSize: 9, cellPadding: 2.6, lineColor: BORDER, lineWidth: 0.2, textColor: [0, 0, 0] },
+      headStyles: { fillColor: NAVY, textColor: [255, 255, 255], fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: [249, 250, 251] },
+      columnStyles: { 3: { cellWidth: 'auto' } }
     });
 
-    y += 3;
-    ensureRoom(1);
-    doc.setFont(undefined, 'bold'); doc.text('Agreed Rate:', LABEL_X, y);
-    doc.setFont(undefined, 'normal'); doc.text(document.getElementById('f-rate').value || '—', VALUE_X, y);
+    /* ── Footer on every page ── */
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(7.5); doc.setTextColor(TEXT_SOFT[0], TEXT_SOFT[1], TEXT_SOFT[2]);
+      doc.text('Geofit Pty Ltd  ·  Durban, South Africa  ·  Generated via Geofit Logistics Hub', MARGIN, 290);
+      doc.text('Page ' + i + ' of ' + pageCount, RIGHT_EDGE, 290, { align: 'right' });
+    }
 
-    const fileNum = document.getElementById('f-file-number').value || 'instructions';
-    doc.save(fileNum + '-Instructions.pdf');
+    const transporterName = v('dd-transporter') || 'Transporter';
+    const safeName = function(s) { return s.replace(/[\/\\:*?"<>|]/g, '-').trim(); };
+    doc.save(safeName(fileNum + ' - ' + transporterName) + ' - Instructions.pdf');
   }
 
   /* ── Containers table ── */
