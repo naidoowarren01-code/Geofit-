@@ -442,7 +442,7 @@
       <div class="detail-card">
         <div class="field"><label>Geofit File Number</label><input id="f-file-number" value="" disabled></div>
         <div class="field"><label>Instruction Date</label><input type="date" id="f-instruction-date"></div>
-        <div class="field"><label>Transporter</label>
+        <div class="field"><label>Transporter <span style="color:#dc2626;">*</span></label>
           <select id="dd-transporter"><option value="">— Select Transporter —</option><option>Naledi</option><option>Umzimkhulu</option><option>Bengu</option></select>
         </div>
       </div>
@@ -457,11 +457,11 @@
       </div>
 
       <div class="detail-card">
-        <div class="field"><label>Traffic</label>
+        <div class="field"><label>Traffic <span style="color:#dc2626;">*</span></label>
           <select id="f-traffic"><option value="">— Select Traffic —</option><option>IMPORT</option><option>EXPORT</option></select>
         </div>
         <div class="field"><label>ETA</label><input type="date" id="f-eta"></div>
-        <div class="field"><label>Terminal</label>
+        <div class="field"><label>Terminal <span style="color:#dc2626;">*</span></label>
           <select id="dd-terminal"><option value="">— Select Terminal —</option><option>Durban Gateway Terminal</option><option>Point DRT</option><option>New Pier 1</option></select>
         </div>
         <div class="field"><label>Booking Reference</label><input id="f-booking-ref" placeholder="—"></div>
@@ -602,6 +602,7 @@
 
   let isSuperUser = false;
   let currentFileId = null;
+  let isNewUnsavedFile = false;
 
   function showToast(msg) {
     const t = document.getElementById('toast');
@@ -824,6 +825,7 @@
   /* ── File-level: new / save / search ── */
   function clearFileForm() {
     currentFileId = null;
+    isNewUnsavedFile = false;
     document.getElementById('search-input').value = '';
     document.getElementById('f-file-number').value = '';
     document.getElementById('file-strip-num').textContent = '— no file loaded —';
@@ -842,19 +844,19 @@
   }
 
   function addNewRecord() {
-    sbClient.from('shipment_files').insert({}).select().single().then(function(res) {
-      if (res.error) { showAlert('Could Not Create File', res.error.message); return; }
-      clearFileForm();
-      currentFileId = res.data.id;
-      document.getElementById('f-file-number').value = res.data.file_number;
-      document.getElementById('file-strip-num').textContent = res.data.file_number;
-      document.getElementById('file-strip-status').textContent = 'NEW';
-      showToast('New file ' + res.data.file_number + ' started');
-    });
+    // No database row is created here — this just opens a blank form.
+    // The real file number is only generated the first time it's actually saved,
+    // so clicking this repeatedly can never burn through GF numbers by mistake.
+    clearFileForm();
+    isNewUnsavedFile = true;
+    document.getElementById('file-strip-num').textContent = '— will be assigned on save —';
+    document.getElementById('file-strip-status').textContent = 'NEW (not yet saved)';
+    showToast('New file started — fill it in and Save to generate a file number');
   }
 
   function populateFileForm(file) {
     currentFileId = file.id;
+    isNewUnsavedFile = false;
     document.getElementById('f-file-number').value = file.file_number || '';
     document.getElementById('file-strip-num').textContent = file.file_number || '—';
     document.getElementById('file-strip-status').textContent = 'LOADED';
@@ -896,10 +898,27 @@
     });
   }
 
+  const MANDATORY_FIELDS = [
+    { id: 'dd-transporter', label: 'Transporter' },
+    { id: 'f-traffic', label: 'Traffic' },
+    { id: 'dd-terminal', label: 'Terminal' }
+  ];
+
+  function getMissingMandatoryFields() {
+    return MANDATORY_FIELDS.filter(function(f) {
+      return !document.getElementById(f.id).value.trim();
+    }).map(function(f) { return f.label; });
+  }
+
   function handleSaveUpdate(silent) {
-    if (!currentFileId) {
+    if (!currentFileId && !isNewUnsavedFile) {
       showAlert('No File Loaded', 'Click "Add New Record" to start a new file, or search for an existing container number first.');
       return Promise.reject('no-file');
+    }
+    const missing = getMissingMandatoryFields();
+    if (missing.length) {
+      showAlert('Missing Required Fields', 'Please fill in before saving: ' + missing.join(', ') + '.');
+      return Promise.reject('missing-fields');
     }
     const payload = {
       instruction_date: document.getElementById('f-instruction-date').value || null,
@@ -919,8 +938,21 @@
       agreed_rate: document.getElementById('f-rate').value,
       updated_at: new Date().toISOString()
     };
-    return sbClient.from('shipment_files').update(payload).eq('id', currentFileId).then(function(res) {
-      if (res.error) { showAlert('Could Not Save File', res.error.message); throw res.error; }
+
+    const savePromise = isNewUnsavedFile
+      ? sbClient.from('shipment_files').insert(payload).select().single().then(function(res) {
+          if (res.error) { showAlert('Could Not Save File', res.error.message); throw res.error; }
+          currentFileId = res.data.id;
+          isNewUnsavedFile = false;
+          document.getElementById('f-file-number').value = res.data.file_number;
+          document.getElementById('file-strip-num').textContent = res.data.file_number;
+          document.getElementById('file-strip-status').textContent = 'NEW';
+        })
+      : sbClient.from('shipment_files').update(payload).eq('id', currentFileId).then(function(res) {
+          if (res.error) { showAlert('Could Not Save File', res.error.message); throw res.error; }
+        });
+
+    return savePromise.then(function() {
       return saveAllContainers();
     }).then(function() {
       if (!silent) showAlert('Geofit Logistics Hub', 'File saved successfully.');
@@ -956,7 +988,7 @@
   }
 
   function generateInstructions() {
-    if (!currentFileId) {
+    if (!currentFileId && !isNewUnsavedFile) {
       showAlert('No File Loaded', 'Add or load a file before generating instructions.');
       return;
     }
