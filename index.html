@@ -301,6 +301,7 @@
   .tracker-step:first-child .line { display: none; }
   .tracker-step.done .line, .tracker-step.current .line { background: var(--accent); }
   .tracker-step .label { font-size: 11.5px; color: var(--text-soft); font-weight: 600; }
+  .step-time { font-size: 9.5px; color: var(--text-soft); opacity: 0.75; margin-top: 2px; font-family: 'IBM Plex Mono', monospace; }
   .tracker-step.current .label { color: #16a34a; }
   .tracker-step.done .label { color: var(--text); }
 
@@ -435,10 +436,10 @@
       </div>
     </div>
     <div class="tracker-stepper">
-      <div class="tracker-step" id="step-0"><div class="line"></div><div class="dot"></div><div class="label">Inbound</div></div>
-      <div class="tracker-step" id="step-1"><div class="line"></div><div class="dot"></div><div class="label">Yard</div></div>
-      <div class="tracker-step" id="step-2"><div class="line"></div><div class="dot"></div><div class="label">EC/Out</div></div>
-      <div class="tracker-step" id="step-3"><div class="line"></div><div class="dot"></div><div class="label">Departed</div></div>
+      <div class="tracker-step" id="step-0"><div class="line"></div><div class="dot"></div><div class="label">Inbound</div><div class="step-time" id="step-0-time"></div></div>
+      <div class="tracker-step" id="step-1"><div class="line"></div><div class="dot"></div><div class="label">Yard</div><div class="step-time" id="step-1-time"></div></div>
+      <div class="tracker-step" id="step-2"><div class="line"></div><div class="dot"></div><div class="label">EC/Out</div><div class="step-time" id="step-2-time"></div></div>
+      <div class="tracker-step" id="step-3"><div class="line"></div><div class="dot"></div><div class="label">Departed</div><div class="step-time" id="step-3-time"></div></div>
     </div>
   </div>
 
@@ -1239,7 +1240,8 @@
     row.dataset.container = tempId;
     row.dataset.stage = existing ? (existing.tracking_stage || 'Inbound') : 'Inbound';
     row.dataset.source = existing ? (existing.tracking_source || 'Not yet tracked') : 'Not yet tracked';
-    row.dataset.checked = existing ? (existing.tracking_checked_at || '—') : '—';
+    row.dataset.checked = existing && existing.tracking_checked_at ? formatDateTime(new Date(existing.tracking_checked_at)) : '—';
+    row.dataset.stageHistory = JSON.stringify(existing && existing.tracking_stage_history ? existing.tracking_stage_history : {});
     if (existing) row.dataset.dbId = existing.id;
     const statusClass = existing && existing.status === 'Closed' ? 'status-closed' : 'status-open';
     const statusLabel = existing && existing.status === 'Closed' ? 'Closed' : 'Open';
@@ -1329,58 +1331,82 @@
   /* ── Live tracking: ICTSI Radar (Durban Gateway Terminal) ── */
   const RADAR_TERMINAL_NAME = 'Durban Gateway Terminal';
 
+  function formatDateTime(d) {
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const yyyy = d.getFullYear();
+    const hh = String(d.getHours()).padStart(2, '0');
+    const min = String(d.getMinutes()).padStart(2, '0');
+    return dd + '/' + mm + '/' + yyyy + ' ' + hh + ':' + min;
+  }
+
+  function getStageHistory(row) {
+    try { return JSON.parse(row.dataset.stageHistory || '{}'); } catch (e) { return {}; }
+  }
+
   function refreshActiveContainerTracking() {
     const terminal = document.getElementById('dd-terminal').value;
     const rows = getTrackedRows();
-    const row = rows.find(function(r) { return r.dataset.container === activeContainerNum; });
-    if (!row) { showToast('Add or select a container first'); return; }
+    if (!rows.length) { showToast('Add a container first'); return; }
     if (terminal !== RADAR_TERMINAL_NAME) {
       showToast('Live tracking for "' + (terminal || 'this terminal') + '" isn\'t wired up yet — only Durban Gateway Terminal (Radar) is live so far.');
       return;
     }
-    refreshRadarTracking(row);
+    // Refreshes every container chip on this file, not just the one currently open
+    rows.forEach(function(row) { refreshRadarTracking(row); });
   }
 
   function refreshRadarTracking(row) {
     const containerNbr = row.querySelector('td:nth-child(2) input').value.trim();
-    if (!containerNbr) { showToast('Enter a container number first'); return; }
+    if (!containerNbr) return;
     row.dataset.source = 'ICTSI Radar — checking…';
     if (row.dataset.container === activeContainerNum) renderDetail();
 
     sbClient.functions.invoke('hyper-service', { body: { container: containerNbr } }).then(function(result) {
       if (result.error) throw result.error;
       const data = result.data;
+      const checkedAt = new Date();
+      const checkedLabel = formatDateTime(checkedAt);
+
       if (!data || !data.found) {
         row.dataset.source = 'ICTSI Radar — not found';
-        row.dataset.checked = 'just now';
+        row.dataset.checked = checkedLabel;
         renderChips();
         if (row.dataset.container === activeContainerNum) renderDetail();
         return;
       }
+
+      const history = getStageHistory(row);
+      if (!history[data.stage]) {
+        history[data.stage] = checkedAt.toISOString();
+      }
+      row.dataset.stageHistory = JSON.stringify(history);
       row.dataset.stage = data.stage;
       row.dataset.source = 'ICTSI Radar — Durban Gateway Terminal';
-      row.dataset.checked = 'just now';
+      row.dataset.checked = checkedLabel;
+
       if (row.dataset.dbId) {
         sbClient.from('containers').update({
           tracking_stage: data.stage,
           tracking_source: row.dataset.source,
-          tracking_checked_at: new Date().toISOString()
+          tracking_checked_at: checkedAt.toISOString(),
+          tracking_stage_history: history
         }).eq('id', row.dataset.dbId).then(function() {});
       }
       renderChips();
       if (row.dataset.container === activeContainerNum) renderDetail();
-      showToast('Tracking updated: ' + data.stage);
     }).catch(function(err) {
       console.error('Radar tracking fetch failed:', err);
       row.dataset.source = 'ICTSI Radar — check failed';
       if (row.dataset.container === activeContainerNum) renderDetail();
-      showAlert('Could Not Refresh Tracking', 'The live tracking check failed: ' + (err.message || err));
+      showAlert('Could Not Refresh Tracking', 'The live tracking check failed for ' + containerNbr + ': ' + (err.message || err));
     });
   }
 
   const STAGES = ['Inbound', 'Yard', 'EC/Out', 'Departed'];
   const STAGE_COLORS = { 'Inbound': '#3b82f6', 'Yard': '#f59e0b', 'EC/Out': '#8b5cf6', 'Departed': '#16a34a' };
   let activeContainerNum = '';
+
 
   function getTrackedRows() {
     return Array.from(document.querySelectorAll('#container-rows tr[data-container]'));
@@ -1411,10 +1437,14 @@
       document.getElementById('tk-container-num').textContent = '—';
       document.getElementById('tk-source').textContent = 'Source: —';
       document.getElementById('tk-checked').textContent = 'Checked —';
-      STAGES.forEach(function(label, i) { document.getElementById('step-' + i).classList.remove('done', 'current'); });
+      STAGES.forEach(function(label, i) {
+        document.getElementById('step-' + i).classList.remove('done', 'current');
+        document.getElementById('step-' + i + '-time').textContent = '';
+      });
       return;
     }
     const stage = row.dataset.stage || 'Inbound';
+    const history = getStageHistory(row);
     document.getElementById('tk-container-num').textContent = activeContainerNum;
     document.getElementById('tk-source').textContent = 'Source: ' + (row.dataset.source || '—');
     document.getElementById('tk-checked').textContent = 'Checked ' + (row.dataset.checked || '—');
@@ -1424,6 +1454,8 @@
       step.classList.remove('done', 'current');
       if (i < currentIdx) step.classList.add('done');
       if (i === currentIdx) step.classList.add('current');
+      const stamp = history[label];
+      document.getElementById('step-' + i + '-time').textContent = stamp ? formatDateTime(new Date(stamp)) : '';
     });
   }
 
