@@ -1347,7 +1347,7 @@
     row.dataset.source = 'ICTSI Radar — checking…';
     if (row.dataset.container === activeContainerNum) renderDetail();
 
-    sbClient.functions.invoke('track-radar', { body: { container: containerNbr } }).then(function(result) {
+    sbClient.functions.invoke('hyper-service', { body: { container: containerNbr } }).then(function(result) {
       if (result.error) throw result.error;
       const data = result.data;
       if (!data || !data.found) {
