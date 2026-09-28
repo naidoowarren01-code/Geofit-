@@ -279,6 +279,11 @@
     0%, 100% { box-shadow: 0 0 0 0 rgba(22,163,74,0.45); }
     50% { box-shadow: 0 0 0 5px rgba(22,163,74,0); }
   }
+  .refresh-btn {
+    margin-left: 10px; background: none; border: 1.5px solid var(--input-border); color: var(--text-soft);
+    font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 20px; cursor: pointer;
+  }
+  .refresh-btn:hover { border-color: var(--accent); color: var(--accent); }
   .tracking-source { font-size: 12px; color: var(--text-soft); }
   .tracking-checked { font-size: 12px; color: var(--text-soft); }
 
@@ -421,6 +426,7 @@
       <div class="tracking-left">
         <span class="tracking-container-num" id="tk-container-num">—</span>
         <span class="live-badge"><span class="live-dot"></span>LIVE</span>
+        <button class="refresh-btn" onclick="refreshActiveContainerTracking()" title="Refresh live tracking">&#8635; Refresh</button>
       </div>
       <div>
         <span class="tracking-source" id="tk-source">Source: —</span>
@@ -1320,6 +1326,58 @@
   }
 
   /* ── Live tracking chips/stepper, driven by the table rows ── */
+  /* ── Live tracking: ICTSI Radar (Durban Gateway Terminal) ── */
+  const RADAR_TERMINAL_NAME = 'Durban Gateway Terminal';
+
+  function refreshActiveContainerTracking() {
+    const terminal = document.getElementById('dd-terminal').value;
+    const rows = getTrackedRows();
+    const row = rows.find(function(r) { return r.dataset.container === activeContainerNum; });
+    if (!row) { showToast('Add or select a container first'); return; }
+    if (terminal !== RADAR_TERMINAL_NAME) {
+      showToast('Live tracking for "' + (terminal || 'this terminal') + '" isn\'t wired up yet — only Durban Gateway Terminal (Radar) is live so far.');
+      return;
+    }
+    refreshRadarTracking(row);
+  }
+
+  function refreshRadarTracking(row) {
+    const containerNbr = row.querySelector('td:nth-child(2) input').value.trim();
+    if (!containerNbr) { showToast('Enter a container number first'); return; }
+    row.dataset.source = 'ICTSI Radar — checking…';
+    if (row.dataset.container === activeContainerNum) renderDetail();
+
+    sbClient.functions.invoke('track-radar', { body: { container: containerNbr } }).then(function(result) {
+      if (result.error) throw result.error;
+      const data = result.data;
+      if (!data || !data.found) {
+        row.dataset.source = 'ICTSI Radar — not found';
+        row.dataset.checked = 'just now';
+        renderChips();
+        if (row.dataset.container === activeContainerNum) renderDetail();
+        return;
+      }
+      row.dataset.stage = data.stage;
+      row.dataset.source = 'ICTSI Radar — Durban Gateway Terminal';
+      row.dataset.checked = 'just now';
+      if (row.dataset.dbId) {
+        sbClient.from('containers').update({
+          tracking_stage: data.stage,
+          tracking_source: row.dataset.source,
+          tracking_checked_at: new Date().toISOString()
+        }).eq('id', row.dataset.dbId).then(function() {});
+      }
+      renderChips();
+      if (row.dataset.container === activeContainerNum) renderDetail();
+      showToast('Tracking updated: ' + data.stage);
+    }).catch(function(err) {
+      console.error('Radar tracking fetch failed:', err);
+      row.dataset.source = 'ICTSI Radar — check failed';
+      if (row.dataset.container === activeContainerNum) renderDetail();
+      showAlert('Could Not Refresh Tracking', 'The live tracking check failed: ' + (err.message || err));
+    });
+  }
+
   const STAGES = ['Inbound', 'Yard', 'EC/Out', 'Departed'];
   const STAGE_COLORS = { 'Inbound': '#3b82f6', 'Yard': '#f59e0b', 'EC/Out': '#8b5cf6', 'Departed': '#16a34a' };
   let activeContainerNum = '';
