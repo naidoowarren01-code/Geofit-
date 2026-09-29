@@ -233,23 +233,6 @@
 
   .rate-box input { max-width: 260px; }
 
-  .broadcast-card {
-    border: 1px solid var(--border); border-radius: 8px; padding: 16px 18px; margin-top: 20px;
-    background: #fafbfc;
-  }
-  .broadcast-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-  .broadcast-head h3 { font-size: 13.5px; margin: 0; }
-  .broadcast-head span { font-size: 11.5px; color: var(--text-soft); }
-  .num-chip-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
-  .num-chip {
-    display: inline-flex; align-items: center; gap: 6px; background: #eef1f5; border-radius: 20px;
-    padding: 5px 6px 5px 12px; font-size: 12px; font-family: 'IBM Plex Mono', monospace;
-  }
-  .num-chip button { background: none; border: none; color: #9aa1ab; cursor: pointer; font-size: 13px; padding: 2px 6px; }
-  .broadcast-add { display: flex; gap: 8px; margin-bottom: 12px; }
-  .broadcast-add input { flex: 1; height: 36px; border-radius: 6px; border: 1px solid var(--input-border); background: var(--input-bg); padding: 0 10px; font-size: 13px; }
-  .copy-msg-btn { background: var(--header); color: #fff; }
-
   .bottom-actions {
     display: flex; gap: 10px; flex-wrap: wrap; margin-top: 22px; padding-top: 20px; border-top: 1px solid var(--border);
   }
@@ -520,37 +503,10 @@
   </div>
 
   <div class="panel">
-    <div class="panel-title"><span class="bar"></span>Financials &amp; Broadcast</div>
+    <div class="panel-title"><span class="bar"></span>Financials</div>
     <div class="field rate-box">
       <label>Agreed Rate (File Level)</label>
       <input id="f-rate" placeholder="e.g. R2700.00 / 12m">
-    </div>
-
-    <div class="broadcast-card">
-      <div class="broadcast-head">
-        <h3>Broadcast Update</h3>
-        <span id="chip-count">3 of 10 numbers</span>
-      </div>
-      <div class="num-chip-row" id="chip-row">
-        <span class="num-chip">082 555 0142 <button onclick="this.parentElement.remove(); updateChipCount()">&times;</button></span>
-        <span class="num-chip">071 884 5635 <button onclick="this.parentElement.remove(); updateChipCount()">&times;</button></span>
-        <span class="num-chip">083 220 9981 <button onclick="this.parentElement.remove(); updateChipCount()">&times;</button></span>
-      </div>
-      <div class="broadcast-add">
-        <input type="text" id="new-number" placeholder="Add a number, e.g. 082 123 4567">
-        <button class="btn btn-primary" onclick="addNumber()">Add</button>
-      </div>
-      <button class="btn copy-msg-btn" onclick="copyBroadcastMessage()">Copy Update for Broadcast List</button>
-      <div style="font-size:11.5px; color:var(--text-soft); margin-top:10px; line-height:1.5;">
-        Copies the update as text — paste it into your WhatsApp Broadcast List (set up once in the WhatsApp app) to reach everyone above in one paste. Fully automatic one-click sending to all numbers is a later phase.
-      </div>
-    </div>
-
-    <div class="bottom-actions">
-      <button class="btn">Customer Tracking</button>
-      <button class="btn">Trans Open Report</button>
-      <button class="btn">Internal Report</button>
-      <button class="btn">Transport Instructions</button>
     </div>
   </div>
   </div>
@@ -1225,6 +1181,41 @@
   }
 
   /* ── Containers table ── */
+  function formatWhatsAppDateTime(d) {
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const hh = String(d.getHours()).padStart(2, '0');
+    const min = String(d.getMinutes()).padStart(2, '0');
+    const ss = String(d.getSeconds()).padStart(2, '0');
+    return yyyy + '/' + mm + '/' + dd + ', ' + hh + ':' + min + ':' + ss;
+  }
+
+  function sendWhatsAppUpdate(btn) {
+    const row = btn.closest('tr');
+    const containerNum = row.querySelector('td:nth-child(2) input').value || '—';
+    const currentStatus = row.querySelector('td:nth-child(5) input:not([type=checkbox])').value || '—';
+    const clientFileNum = document.getElementById('f-client-file-number').value || '—';
+    const vesselName = document.getElementById('f-vessel-name').value || '—';
+    const deliveryAddress = document.getElementById('dd-address').value || '—';
+    const nowStr = formatWhatsAppDateTime(new Date());
+
+    const message =
+      '👋 *Good Day*\n\n' +
+      'Please find updated tracking details below:\n\n' +
+      '📁 *Client File Number:* ' + clientFileNum + '\n' +
+      '📦 *Container Number:* ' + containerNum + '\n' +
+      '🚢 *Vessel Name:* ' + vesselName + '\n' +
+      '📍 *Delivery Address:* ' + deliveryAddress + '\n' +
+      '📌 *Current Status:* ' + currentStatus + '\n' +
+      '🕒 *Date and Time:* ' + nowStr + '\n\n' +
+      '*Team Geofit*\n' +
+      '✉️ info@geofit.co.za\n' +
+      '🌐 www.geofit.co.za';
+
+    window.open('https://api.whatsapp.com/send?text=' + encodeURIComponent(message), '_blank');
+  }
+
   function toggleStatus(btn) {
     const isOpen = btn.classList.contains('status-open');
     btn.classList.toggle('status-open', !isOpen);
@@ -1253,7 +1244,7 @@
       <td><div class="msg-cell"><input placeholder="Current status message" value="${existing ? existing.current_status || '' : ''}"><input type="checkbox" ${existing && existing.current_status_highlight ? 'checked' : ''} title="Bold blue in report"></div></td>
       <td><div class="msg-cell"><input placeholder="Remarks" value="${existing ? existing.trans_remarks || '' : ''}"><input type="checkbox" ${existing && existing.trans_remarks_highlight ? 'checked' : ''} title="Bold blue in report"></div></td>
       <td><button class="status-pill ${statusClass}" onclick="toggleStatus(this)"><span class="status-dot"></span> ${statusLabel}</button></td>
-      <td><button class="wa-btn" onclick="showToast('WhatsApp message sent')">Send</button></td>
+      <td><button class="wa-btn" onclick="sendWhatsAppUpdate(this)">Send</button></td>
       <td><button class="del-btn" onclick="confirmDeleteContainer(this)">&times;</button></td>
     `;
     tbody.appendChild(row);
@@ -1295,36 +1286,6 @@
     }
     renderChips();
     if (activeContainerNum) renderDetail();
-  }
-
-  /* ── Broadcast list (unchanged — local only for now) ── */
-  function updateChipCount() {
-    const count = document.getElementById('chip-row').children.length;
-    document.getElementById('chip-count').textContent = count + ' of 10 numbers';
-  }
-
-  function addNumber() {
-    const input = document.getElementById('new-number');
-    const val = input.value.trim();
-    const row = document.getElementById('chip-row');
-    if (!val) return;
-    if (row.children.length >= 10) { showToast('Limit of 10 numbers reached'); return; }
-    const chip = document.createElement('span');
-    chip.className = 'num-chip';
-    chip.innerHTML = val + ' <button onclick="this.parentElement.remove(); updateChipCount()">&times;</button>';
-    row.appendChild(chip);
-    input.value = '';
-    updateChipCount();
-  }
-
-  function copyBroadcastMessage() {
-    const firstRow = document.querySelector('#container-rows tr');
-    if (!firstRow) { showToast('No containers on this file yet'); return; }
-    const containerNum = firstRow.querySelector('td:nth-child(2) input').value;
-    const currentStatus = firstRow.querySelector('td:nth-child(5) input:not([type=checkbox])').value;
-    const fileNum = document.getElementById('f-file-number').value || '—';
-    const msg = "GEOFIT UPDATE\nFile: " + fileNum + "\nContainer: " + containerNum + "\nStatus: " + currentStatus;
-    navigator.clipboard.writeText(msg).then(() => showToast('Copied — paste into your Broadcast List'));
   }
 
   /* ── Live tracking chips/stepper, driven by the table rows ── */
