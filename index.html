@@ -1381,7 +1381,11 @@
       }
 
       const history = getStageHistory(row);
-      if (!history[data.stage]) {
+      if (data.state_changed_at) {
+        // Radar tells us exactly when it entered this state — always trust that over our own guess
+        history[data.stage] = data.state_changed_at;
+      } else if (!history[data.stage]) {
+        // No real timestamp available from this source — fall back to "first time we noticed"
         history[data.stage] = checkedAt.toISOString();
       }
       row.dataset.stageHistory = JSON.stringify(history);
