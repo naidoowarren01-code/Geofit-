@@ -780,11 +780,20 @@
       .select('container_number, current_status, shipment_files!inner(client_file_number, file_number, vessel_name, delivery_address, eta, client_name)')
       .eq('status', 'Open')
       .eq('shipment_files.client_name', clientName)
-      .order('eta', { foreignTable: 'shipment_files', ascending: true })
       .then(function(res) {
         if (res.error) { showAlert('Could Not Generate Report', res.error.message); return; }
         if (!res.data || !res.data.length) { showAlert('No Open Files', 'There are no Open containers for ' + clientName + ' right now.'); return; }
-        buildTrackingReportPDF(clientName, res.data);
+        // Sorted here in JS (closest ETA first, undated rows sink to the bottom) —
+        // ordering through the nested database join wasn't applying reliably.
+        const sorted = res.data.slice().sort(function(a, b) {
+          const etaA = a.shipment_files.eta;
+          const etaB = b.shipment_files.eta;
+          if (!etaA && !etaB) return 0;
+          if (!etaA) return 1;
+          if (!etaB) return -1;
+          return etaA < etaB ? -1 : (etaA > etaB ? 1 : 0);
+        });
+        buildTrackingReportPDF(clientName, sorted);
       });
   }
 
