@@ -370,9 +370,9 @@
 <div class="sidebar">
   <div class="sidebar-logo">GEOFIT LOGISTICS HUB</div>
   <div class="sidebar-nav">
-    <div class="sidebar-link"><span class="ic">&#9635;</span> Dashboard</div>
-    <div class="sidebar-link active"><span class="ic">&#128196;</span> Shipment Registration</div>
-    <div class="sidebar-link"><span class="ic">&#128202;</span> Reports</div>
+    <div class="sidebar-link" id="nav-dashboard" onclick="showToast('Dashboard isn\'t built yet')"><span class="ic">&#9635;</span> Dashboard</div>
+    <div class="sidebar-link active" id="nav-registration" onclick="showView('registration')"><span class="ic">&#128196;</span> Shipment Registration</div>
+    <div class="sidebar-link" id="nav-reports" onclick="showView('reports')"><span class="ic">&#128202;</span> Reports</div>
     <div class="sidebar-link" onclick="handleFinancialsClick()"><span class="ic">&#128176;</span> Financials</div>
     <div class="sidebar-link" onclick="openCompanySetup()"><span class="ic">&#9881;</span> Company Setup</div>
   </div>
@@ -387,7 +387,7 @@
   <div style="padding:26px 28px 6px;">
     <h1 style="margin:0; font-size:26px; font-weight:800; color:var(--header);">Welcome to Geofit Logistics Hub</h1>
   </div>
-  <div class="topbar" style="border-top:1px solid var(--border);">
+  <div class="topbar" id="registration-topbar" style="border-top:1px solid var(--border);">
     <input type="text" id="search-input" placeholder="Search by Container Number...">
     <button class="btn btn-primary" style="margin-left:-4px;" onclick="searchContainer()">&#128269; Search</button>
     <div class="topbar-spacer"></div>
@@ -397,7 +397,7 @@
     <button class="btn btn-primary" onclick="generateInstructions()"><span class="btn-icon">&#128196;</span>Generate Instructions</button>
   </div>
 
-  <div class="page-pad">
+  <div class="page-pad" id="view-registration">
   <div class="wrap">
 
   <div class="page-head"><h2>Shipment Details</h2></div>
@@ -509,6 +509,26 @@
       <input id="f-rate" placeholder="e.g. R2700.00 / 12m">
     </div>
   </div>
+  </div>
+  </div>
+
+  <div class="page-pad" id="view-reports" style="display:none;">
+  <div class="wrap">
+    <div class="page-head"><h2>Reports</h2></div>
+    <div class="panel accent-top">
+      <div class="panel-title"><span class="bar"></span>Tracking Report</div>
+      <div style="font-size:12.5px; color:var(--text-soft); margin-bottom:16px;">
+        Pulls every Open container for the selected client, sorted by nearest ETA first, and saves it as a PDF.
+      </div>
+      <div class="detail-cards">
+        <div class="detail-card">
+          <div class="field"><label>Client</label>
+            <select id="report-client"><option value="">— Select Client —</option></select>
+          </div>
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="generateTrackingReport()"><span class="btn-icon">&#128196;</span>Generate Tracking Report PDF</button>
+    </div>
   </div>
   </div>
 </div>
@@ -724,6 +744,145 @@
     });
     const values = cfg.items.map(function(r) { return r[cfg.column]; });
     if (values.includes(current)) select.value = current;
+  }
+
+  /* ── View switching (sidebar) ── */
+  function showView(name) {
+    document.getElementById('registration-topbar').style.display = (name === 'registration') ? 'flex' : 'none';
+    document.getElementById('view-registration').style.display = (name === 'registration') ? 'block' : 'none';
+    document.getElementById('view-reports').style.display = (name === 'reports') ? 'block' : 'none';
+    document.getElementById('nav-registration').classList.toggle('active', name === 'registration');
+    document.getElementById('nav-reports').classList.toggle('active', name === 'reports');
+    if (name === 'reports') populateReportClientDropdown();
+  }
+
+  function populateReportClientDropdown() {
+    const select = document.getElementById('report-client');
+    const current = select.value;
+    sbClient.from('clients').select('name').order('name').then(function(res) {
+      if (res.error) return;
+      select.innerHTML = '<option value="">— Select Client —</option>';
+      (res.data || []).forEach(function(row) {
+        const opt = document.createElement('option');
+        opt.textContent = row.name;
+        select.appendChild(opt);
+      });
+      if (current) select.value = current;
+    });
+  }
+
+  /* ── Tracking Report PDF ── */
+  function generateTrackingReport() {
+    const clientName = document.getElementById('report-client').value;
+    if (!clientName) { showAlert('Select a Client', 'Please choose a client before generating the report.'); return; }
+
+    sbClient.from('containers')
+      .select('container_number, current_status, shipment_files!inner(client_file_number, file_number, vessel_name, delivery_address, eta, client_name)')
+      .eq('status', 'Open')
+      .eq('shipment_files.client_name', clientName)
+      .order('eta', { foreignTable: 'shipment_files', ascending: true })
+      .then(function(res) {
+        if (res.error) { showAlert('Could Not Generate Report', res.error.message); return; }
+        if (!res.data || !res.data.length) { showAlert('No Open Files', 'There are no Open containers for ' + clientName + ' right now.'); return; }
+        buildTrackingReportPDF(clientName, res.data);
+      });
+  }
+
+  function buildTrackingReportPDF(clientName, rows) {
+    if (!window.jspdf || !window.jspdf.jsPDF) {
+      showAlert('PDF Tool Not Loaded', 'The PDF library did not load. Try refreshing the page.');
+      return;
+    }
+    const jsPDFCtor = window.jspdf.jsPDF;
+    const doc = new jsPDFCtor({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    const PAGE_W = 297, MARGIN = 12, RIGHT_EDGE = PAGE_W - MARGIN;
+    const NAVY = [15, 42, 74], BORDER = [200, 205, 212], TEXT_SOFT = [100, 108, 118];
+
+    const now = new Date();
+    const printedStamp = String(now.getFullYear()) + '/' + String(now.getMonth() + 1).padStart(2, '0') + '/' + String(now.getDate()).padStart(2, '0') +
+      ', ' + String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0') + ':' + String(now.getSeconds()).padStart(2, '0');
+    const fmtEta = function(iso) {
+      if (!iso) return '—';
+      const p = iso.split('-');
+      return p.length === 3 ? p[2] + '/' + p[1] + '/' + p[0] : iso;
+    };
+
+    let y = 16;
+    doc.setFontSize(16); doc.setFont(undefined, 'bold'); doc.setTextColor(0, 0, 0);
+    doc.text('Geofit Customer Tracking Report', MARGIN, y);
+    y += 7;
+    doc.setFontSize(10.5); doc.setFont(undefined, 'normal'); doc.setTextColor(TEXT_SOFT[0], TEXT_SOFT[1], TEXT_SOFT[2]);
+    doc.text(clientName + '  |  Printed: ' + printedStamp, MARGIN, y);
+    y += 6;
+
+    const colW = [26, 26, 34, 68, 30, 20, 0];
+    colW[6] = (RIGHT_EDGE - MARGIN) - (colW[0] + colW[1] + colW[2] + colW[3] + colW[4] + colW[5]);
+    const headers = ['Client File', 'Geofit File', 'Vessel Name', 'Delivery Address', 'Container Number', 'ETA', 'Current Status'];
+    const CELL_PAD = 2.2, LINE_H = 4;
+
+    function footerLine(pageNum, pageCount) {
+      doc.setFontSize(8); doc.setTextColor(TEXT_SOFT[0], TEXT_SOFT[1], TEXT_SOFT[2]);
+      doc.text('Geofit PTY Ltd  |  www.geofit.co.za  |  info@geofit.co.za', MARGIN, 202);
+    }
+
+    function drawRow(cells, isHeader, altFill) {
+      let maxLines = 1;
+      const wrapped = cells.map(function(txt, i) {
+        const lines = doc.splitTextToSize(String(txt), colW[i] - 4);
+        maxLines = Math.max(maxLines, lines.length);
+        return lines;
+      });
+      const rowH = maxLines * LINE_H + CELL_PAD * 2 - LINE_H + 1.5;
+      if (y + rowH > 192) {
+        footerLine();
+        doc.addPage();
+        y = 16;
+      }
+      if (isHeader) {
+        doc.setFillColor(NAVY[0], NAVY[1], NAVY[2]);
+        doc.rect(MARGIN, y, RIGHT_EDGE - MARGIN, rowH, 'F');
+      } else if (altFill) {
+        doc.setFillColor(249, 250, 251);
+        doc.rect(MARGIN, y, RIGHT_EDGE - MARGIN, rowH, 'F');
+      }
+      doc.setDrawColor(BORDER[0], BORDER[1], BORDER[2]); doc.setLineWidth(0.2);
+      doc.rect(MARGIN, y, RIGHT_EDGE - MARGIN, rowH);
+      let cx = MARGIN;
+      wrapped.forEach(function(lines, i) {
+        if (i > 0) doc.line(cx, y, cx, y + rowH);
+        doc.setFontSize(8.5);
+        doc.setFont(undefined, isHeader ? 'bold' : 'normal');
+        doc.setTextColor.apply(doc, isHeader ? [255, 255, 255] : [0, 0, 0]);
+        doc.text(lines, cx + 2, y + CELL_PAD + 2.6);
+        cx += colW[i];
+      });
+      y += rowH;
+    }
+
+    drawRow(headers, true, false);
+    rows.forEach(function(r, i) {
+      const f = r.shipment_files;
+      drawRow([
+        f.client_file_number || '—',
+        f.file_number || '—',
+        f.vessel_name || '—',
+        f.delivery_address || '—',
+        r.container_number || '—',
+        fmtEta(f.eta),
+        r.current_status || '—'
+      ], false, i % 2 === 1);
+    });
+
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8); doc.setTextColor(TEXT_SOFT[0], TEXT_SOFT[1], TEXT_SOFT[2]);
+      doc.text('Geofit PTY Ltd  |  www.geofit.co.za  |  info@geofit.co.za', MARGIN, 202);
+    }
+
+    const dateStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+    const safeName = function(s) { return s.replace(/[\/\\:*?"<>|]/g, '-').trim(); };
+    doc.save(safeName(clientName + ' - ' + dateStr) + '.pdf');
   }
 
   function openCompanySetup() {
