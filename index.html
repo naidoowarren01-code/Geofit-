@@ -529,6 +529,42 @@
       </div>
       <button class="btn btn-primary" onclick="generateTrackingReport()"><span class="btn-icon">&#128196;</span>Generate Tracking Report PDF</button>
     </div>
+
+    <div class="panel accent-top">
+      <div class="panel-title"><span class="bar"></span>Transporter Report</div>
+      <div style="font-size:12.5px; color:var(--text-soft); margin-bottom:16px;">
+        Pulls every Open container for the selected transporter, sorted by nearest ETA first, and saves it as a PDF.
+      </div>
+      <div class="detail-cards">
+        <div class="detail-card">
+          <div class="field"><label>Transporter</label>
+            <select id="report-transporter"><option value="">— Select Transporter —</option></select>
+          </div>
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="generateTransporterReport()"><span class="btn-icon">&#128196;</span>Generate Transporter Report PDF</button>
+    </div>
+
+    <div class="panel accent-top">
+      <div class="panel-title"><span class="bar"></span>Internal Report</div>
+      <div style="font-size:12.5px; color:var(--text-soft); margin-bottom:16px;">
+        Pulls every file across all clients for the chosen date range and status, sorted by nearest ETA first.
+      </div>
+      <div class="detail-cards">
+        <div class="detail-card">
+          <div class="field"><label>From Date</label><input type="date" id="report-from-date"></div>
+          <div class="field"><label>To Date</label><input type="date" id="report-to-date"></div>
+          <div class="field"><label>Status</label>
+            <select id="report-status">
+              <option value="Open">Open — only open files for that period</option>
+              <option value="Closed">Closed — only closed files for that period</option>
+              <option value="All">All File — open and closed for that period</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="generateInternalReport()"><span class="btn-icon">&#128196;</span>Generate Internal Report PDF</button>
+    </div>
   </div>
   </div>
 </div>
@@ -753,18 +789,21 @@
     document.getElementById('view-reports').style.display = (name === 'reports') ? 'block' : 'none';
     document.getElementById('nav-registration').classList.toggle('active', name === 'registration');
     document.getElementById('nav-reports').classList.toggle('active', name === 'reports');
-    if (name === 'reports') populateReportClientDropdown();
+    if (name === 'reports') {
+      populateReportDropdown('clients', 'name', 'report-client', 'Client');
+      populateReportDropdown('transporters', 'name', 'report-transporter', 'Transporter');
+    }
   }
 
-  function populateReportClientDropdown() {
-    const select = document.getElementById('report-client');
+  function populateReportDropdown(table, column, selectId, label) {
+    const select = document.getElementById(selectId);
     const current = select.value;
-    sbClient.from('clients').select('name').order('name').then(function(res) {
+    sbClient.from(table).select(column).order(column).then(function(res) {
       if (res.error) return;
-      select.innerHTML = '<option value="">— Select Client —</option>';
+      select.innerHTML = '<option value="">— Select ' + label + ' —</option>';
       (res.data || []).forEach(function(row) {
         const opt = document.createElement('option');
-        opt.textContent = row.name;
+        opt.textContent = row[column];
         select.appendChild(opt);
       });
       if (current) select.value = current;
@@ -892,6 +931,182 @@
     const dateStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
     const safeName = function(s) { return s.replace(/[\/\\:*?"<>|]/g, '-').trim(); };
     doc.save(safeName(clientName + ' - ' + dateStr) + '.pdf');
+  }
+
+  /* ── Shared helper: draws a paginated, bordered report table with a navy header row ── */
+  function drawReportTable(doc, opts) {
+    const MARGIN = opts.margin, RIGHT_EDGE = opts.rightEdge, NAVY = [15, 42, 74], BORDER = [200, 205, 212];
+    const CELL_PAD = 2.2, LINE_H = 4;
+    let y = opts.startY;
+
+    function footerAllPages() {
+      const pageCount = doc.internal.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8); doc.setTextColor(100, 108, 118);
+        doc.text('Geofit PTY Ltd  |  www.geofit.co.za  |  info@geofit.co.za', MARGIN, opts.footerY);
+      }
+    }
+
+    function drawRow(cells, isHeader, altFill) {
+      let maxLines = 1;
+      const wrapped = cells.map(function(txt, i) {
+        const lines = doc.splitTextToSize(String(txt), opts.colW[i] - 4);
+        maxLines = Math.max(maxLines, lines.length);
+        return lines;
+      });
+      const rowH = maxLines * LINE_H + CELL_PAD * 2 - LINE_H + 1.5;
+      if (y + rowH > opts.pageBottom) {
+        doc.addPage();
+        y = opts.restartY;
+      }
+      if (isHeader) {
+        doc.setFillColor(NAVY[0], NAVY[1], NAVY[2]);
+        doc.rect(MARGIN, y, RIGHT_EDGE - MARGIN, rowH, 'F');
+      } else if (altFill) {
+        doc.setFillColor(249, 250, 251);
+        doc.rect(MARGIN, y, RIGHT_EDGE - MARGIN, rowH, 'F');
+      }
+      doc.setDrawColor(BORDER[0], BORDER[1], BORDER[2]); doc.setLineWidth(0.2);
+      doc.rect(MARGIN, y, RIGHT_EDGE - MARGIN, rowH);
+      let cx = MARGIN;
+      wrapped.forEach(function(lines, i) {
+        if (i > 0) doc.line(cx, y, cx, y + rowH);
+        doc.setFontSize(8); doc.setFont(undefined, isHeader ? 'bold' : 'normal');
+        doc.setTextColor.apply(doc, isHeader ? [255, 255, 255] : [0, 0, 0]);
+        doc.text(lines, cx + 2, y + CELL_PAD + 2.6);
+        cx += opts.colW[i];
+      });
+      y += rowH;
+    }
+
+    drawRow(opts.headers, true, false);
+    opts.rows.forEach(function(r, i) { drawRow(r, false, i % 2 === 1); });
+    footerAllPages();
+  }
+
+  function fmtReportDate(iso) {
+    if (!iso) return '—';
+    const p = iso.split('-');
+    return p.length === 3 ? p[2] + '/' + p[1] + '/' + p[0] : iso;
+  }
+
+  function printedStampNow() {
+    const now = new Date();
+    return String(now.getFullYear()) + '/' + String(now.getMonth() + 1).padStart(2, '0') + '/' + String(now.getDate()).padStart(2, '0') +
+      ', ' + String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0') + ':' + String(now.getSeconds()).padStart(2, '0');
+  }
+
+  function sortByEtaAsc(rows, getEta) {
+    return rows.slice().sort(function(a, b) {
+      const etaA = getEta(a), etaB = getEta(b);
+      if (!etaA && !etaB) return 0;
+      if (!etaA) return 1;
+      if (!etaB) return -1;
+      return etaA < etaB ? -1 : (etaA > etaB ? 1 : 0);
+    });
+  }
+
+  /* ── Transporter Report PDF ── */
+  function generateTransporterReport() {
+    const transporterName = document.getElementById('report-transporter').value;
+    if (!transporterName) { showAlert('Select a Transporter', 'Please choose a transporter before generating the report.'); return; }
+
+    sbClient.from('containers')
+      .select('container_number, container_size, gross_weight, trans_remarks, shipment_files!inner(file_number, vessel_name, terminal, delivery_address, eta, transporter)')
+      .eq('status', 'Open')
+      .eq('shipment_files.transporter', transporterName)
+      .then(function(res) {
+        if (res.error) { showAlert('Could Not Generate Report', res.error.message); return; }
+        if (!res.data || !res.data.length) { showAlert('No Open Files', 'There are no Open containers for ' + transporterName + ' right now.'); return; }
+        const sorted = sortByEtaAsc(res.data, function(r) { return r.shipment_files.eta; });
+        buildTransporterReportPDF(transporterName, sorted);
+      });
+  }
+
+  function buildTransporterReportPDF(transporterName, rows) {
+    if (!window.jspdf || !window.jspdf.jsPDF) { showAlert('PDF Tool Not Loaded', 'The PDF library did not load. Try refreshing the page.'); return; }
+    const doc = new window.jspdf.jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    const MARGIN = 12, RIGHT_EDGE = 297 - MARGIN;
+
+    let y = 16;
+    doc.setFontSize(16); doc.setFont(undefined, 'bold'); doc.setTextColor(0, 0, 0);
+    doc.text('Geofit Transporter Open Report', MARGIN, y);
+    y += 7;
+    doc.setFontSize(10.5); doc.setFont(undefined, 'normal'); doc.setTextColor(100, 108, 118);
+    doc.text(transporterName + '  |  Printed: ' + printedStampNow(), MARGIN, y);
+    y += 6;
+
+    const colW = [22, 26, 30, 62, 28, 14, 18, 20, 0];
+    colW[8] = (RIGHT_EDGE - MARGIN) - colW.slice(0, 8).reduce(function(a, b) { return a + b; }, 0);
+    const headers = ['Geofit File', 'Vessel', 'Terminal', 'Delivery Address', 'Container', 'Size', 'Weight', 'ETA', 'Remarks'];
+
+    const tableRows = rows.map(function(r) {
+      const f = r.shipment_files;
+      return [f.file_number || '—', f.vessel_name || '—', f.terminal || '—', f.delivery_address || '—',
+        r.container_number || '—', r.container_size || '—', r.gross_weight || '—', fmtReportDate(f.eta), r.trans_remarks || '—'];
+    });
+
+    drawReportTable(doc, { margin: MARGIN, rightEdge: RIGHT_EDGE, colW: colW, headers: headers, rows: tableRows, startY: y, pageBottom: 192, restartY: 16, footerY: 202 });
+
+    const now = new Date();
+    const dateStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+    const safeName = function(s) { return s.replace(/[\/\\:*?"<>|]/g, '-').trim(); };
+    doc.save(safeName(transporterName + ' - ' + dateStr) + '.pdf');
+  }
+
+  /* ── Internal Report PDF ── */
+  function generateInternalReport() {
+    const fromDate = document.getElementById('report-from-date').value;
+    const toDate = document.getElementById('report-to-date').value;
+    const status = document.getElementById('report-status').value;
+    if (!fromDate || !toDate) { showAlert('Missing Dates', 'Please choose both a From Date and a To Date.'); return; }
+
+    let query = sbClient.from('containers')
+      .select('container_number, container_size, gross_weight, current_status, trans_remarks, status, shipment_files!inner(file_number, client_name, vessel_name, terminal, delivery_address, eta, transporter)')
+      .gte('shipment_files.eta', fromDate)
+      .lte('shipment_files.eta', toDate);
+    if (status !== 'All') query = query.eq('status', status);
+
+    query.then(function(res) {
+      if (res.error) { showAlert('Could Not Generate Report', res.error.message); return; }
+      if (!res.data || !res.data.length) { showAlert('No Matching Files', 'No files found for that date range and status.'); return; }
+      const sorted = sortByEtaAsc(res.data, function(r) { return r.shipment_files.eta; });
+      buildInternalReportPDF(fromDate, toDate, status, sorted);
+    });
+  }
+
+  function buildInternalReportPDF(fromDate, toDate, status, rows) {
+    if (!window.jspdf || !window.jspdf.jsPDF) { showAlert('PDF Tool Not Loaded', 'The PDF library did not load. Try refreshing the page.'); return; }
+    const doc = new window.jspdf.jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    const MARGIN = 10, RIGHT_EDGE = 297 - MARGIN;
+
+    let y = 16;
+    doc.setFontSize(16); doc.setFont(undefined, 'bold'); doc.setTextColor(0, 0, 0);
+    doc.text('Geofit Internal Report', MARGIN, y);
+    y += 7;
+    doc.setFontSize(10.5); doc.setFont(undefined, 'normal'); doc.setTextColor(100, 108, 118);
+    doc.text('All Clients  |  Printed: ' + printedStampNow(), MARGIN, y);
+    y += 5.5;
+    doc.setFontSize(9);
+    doc.text(fmtReportDate(fromDate) + ' to ' + fmtReportDate(toDate) + '  |  Status: ' + status, MARGIN, y);
+    y += 6;
+
+    const colW = [18, 24, 20, 22, 42, 22, 11, 15, 16, 18, 28, 0];
+    colW[11] = (RIGHT_EDGE - MARGIN) - colW.slice(0, 11).reduce(function(a, b) { return a + b; }, 0);
+    const headers = ['GF File', 'Client', 'Vessel', 'Terminal', 'Address', 'Container', 'Size', 'Weight', 'ETA', 'Transporter', 'Status', 'Remarks'];
+
+    const tableRows = rows.map(function(r) {
+      const f = r.shipment_files;
+      return [f.file_number || '—', f.client_name || '—', f.vessel_name || '—', f.terminal || '—', f.delivery_address || '—',
+        r.container_number || '—', r.container_size || '—', r.gross_weight || '—', fmtReportDate(f.eta), f.transporter || '—',
+        r.current_status || '—', r.trans_remarks || '—'];
+    });
+
+    drawReportTable(doc, { margin: MARGIN, rightEdge: RIGHT_EDGE, colW: colW, headers: headers, rows: tableRows, startY: y, pageBottom: 192, restartY: 16, footerY: 202 });
+
+    const safeName = function(s) { return s.replace(/[\/\\:*?"<>|]/g, '-').trim(); };
+    doc.save(safeName('Internal Report - ' + status + ' - ' + fromDate + ' to ' + toDate) + '.pdf');
   }
 
   function openCompanySetup() {
