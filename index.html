@@ -233,6 +233,18 @@
 
   .rate-box input { max-width: 260px; }
 
+  .report-tabs { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+  .report-tab {
+    flex: 1; min-width: 180px; display: flex; align-items: center; gap: 12px;
+    background: var(--card); border: 1.5px solid var(--border); border-radius: 10px;
+    padding: 14px 16px; cursor: pointer; transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  .report-tab:hover { border-color: var(--accent); }
+  .report-tab.active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  .report-tab-icon { font-size: 20px; }
+  .report-tab-title { font-size: 13px; font-weight: 700; color: var(--text); }
+  .report-tab-sub { font-size: 11px; color: var(--text-soft); margin-top: 1px; }
+
   .bottom-actions {
     display: flex; gap: 10px; flex-wrap: wrap; margin-top: 22px; padding-top: 20px; border-top: 1px solid var(--border);
   }
@@ -515,7 +527,23 @@
   <div class="page-pad" id="view-reports" style="display:none;">
   <div class="wrap">
     <div class="page-head"><h2>Reports</h2></div>
-    <div class="panel accent-top">
+
+    <div class="report-tabs">
+      <div class="report-tab active" id="rtab-tracking" onclick="showReportTab('tracking')">
+        <span class="report-tab-icon">&#128202;</span>
+        <div><div class="report-tab-title">Tracking Report</div><div class="report-tab-sub">Open files by client</div></div>
+      </div>
+      <div class="report-tab" id="rtab-transporter" onclick="showReportTab('transporter')">
+        <span class="report-tab-icon">&#128666;</span>
+        <div><div class="report-tab-title">Transporter Report</div><div class="report-tab-sub">Open files by transporter</div></div>
+      </div>
+      <div class="report-tab" id="rtab-internal" onclick="showReportTab('internal')">
+        <span class="report-tab-icon">&#128203;</span>
+        <div><div class="report-tab-title">Internal Report</div><div class="report-tab-sub">All clients, by date range</div></div>
+      </div>
+    </div>
+
+    <div class="panel accent-top" id="rpanel-tracking">
       <div class="panel-title"><span class="bar"></span>Tracking Report</div>
       <div style="font-size:12.5px; color:var(--text-soft); margin-bottom:16px;">
         Pulls every Open container for the selected client, sorted by nearest ETA first, and saves it as a PDF.
@@ -530,7 +558,7 @@
       <button class="btn btn-primary" onclick="generateTrackingReport()"><span class="btn-icon">&#128196;</span>Generate Tracking Report PDF</button>
     </div>
 
-    <div class="panel accent-top">
+    <div class="panel accent-top" id="rpanel-transporter" style="display:none;">
       <div class="panel-title"><span class="bar"></span>Transporter Report</div>
       <div style="font-size:12.5px; color:var(--text-soft); margin-bottom:16px;">
         Pulls every Open container for the selected transporter, sorted by nearest ETA first, and saves it as a PDF.
@@ -545,7 +573,7 @@
       <button class="btn btn-primary" onclick="generateTransporterReport()"><span class="btn-icon">&#128196;</span>Generate Transporter Report PDF</button>
     </div>
 
-    <div class="panel accent-top">
+    <div class="panel accent-top" id="rpanel-internal" style="display:none;">
       <div class="panel-title"><span class="bar"></span>Internal Report</div>
       <div style="font-size:12.5px; color:var(--text-soft); margin-bottom:16px;">
         Pulls every file across all clients for the chosen date range and status, sorted by nearest ETA first.
@@ -783,6 +811,13 @@
   }
 
   /* ── View switching (sidebar) ── */
+  function showReportTab(name) {
+    ['tracking', 'transporter', 'internal'].forEach(function(n) {
+      document.getElementById('rpanel-' + n).style.display = (n === name) ? 'block' : 'none';
+      document.getElementById('rtab-' + n).classList.toggle('active', n === name);
+    });
+  }
+
   function showView(name) {
     document.getElementById('registration-topbar').style.display = (name === 'registration') ? 'flex' : 'none';
     document.getElementById('view-registration').style.display = (name === 'registration') ? 'block' : 'none';
