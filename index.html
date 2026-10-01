@@ -245,6 +245,15 @@
   .report-tab-title { font-size: 13px; font-weight: 700; color: var(--text); }
   .report-tab-sub { font-size: 11px; color: var(--text-soft); margin-top: 1px; }
 
+  .paid-checkbox { width: 20px; height: 20px; cursor: pointer; accent-color: #16a34a; }
+
+  @media print {
+    body * { visibility: hidden; }
+    #fin-report-output, #fin-report-output * { visibility: visible; }
+    #fin-report-output { position: absolute; left: 0; top: 0; width: 100%; }
+    #fin-report-output button { display: none; }
+  }
+
   .bottom-actions {
     display: flex; gap: 10px; flex-wrap: wrap; margin-top: 22px; padding-top: 20px; border-top: 1px solid var(--border);
   }
@@ -385,7 +394,7 @@
     <div class="sidebar-link" id="nav-dashboard" onclick="showToast('Dashboard isn\'t built yet')"><span class="ic">&#9635;</span> Dashboard</div>
     <div class="sidebar-link active" id="nav-registration" onclick="showView('registration')"><span class="ic">&#128196;</span> Shipment Registration</div>
     <div class="sidebar-link" id="nav-reports" onclick="showView('reports')"><span class="ic">&#128202;</span> Reports</div>
-    <div class="sidebar-link" onclick="handleFinancialsClick()"><span class="ic">&#128176;</span> Financials</div>
+    <div class="sidebar-link" id="nav-financials" onclick="handleFinancialsClick()"><span class="ic">&#128176;</span> Financials</div>
     <div class="sidebar-link" onclick="openCompanySetup()"><span class="ic">&#9881;</span> Company Setup</div>
   </div>
   <div class="sidebar-foot">
@@ -595,6 +604,110 @@
     </div>
   </div>
   </div>
+
+  <div class="page-pad" id="view-financials" style="display:none;">
+  <div class="wrap">
+    <div class="page-head"><h2>Financials</h2></div>
+
+    <div class="report-tabs">
+      <div class="report-tab active" id="ftab-capture" onclick="showFinTab('capture')">
+        <span class="report-tab-icon">&#9999;</span>
+        <div><div class="report-tab-title">Capture Payment Details</div><div class="report-tab-sub">Enter invoice info per container</div></div>
+      </div>
+      <div class="report-tab" id="ftab-report" onclick="showFinTab('report')">
+        <span class="report-tab-icon">&#128176;</span>
+        <div><div class="report-tab-title">Payment Report</div><div class="report-tab-sub">Search, view totals, export</div></div>
+      </div>
+    </div>
+
+    <div class="panel accent-top" id="fpanel-capture">
+      <div class="panel-title"><span class="bar"></span>Capture Payment Details</div>
+      <div style="display:flex; gap:10px; margin-bottom:16px;">
+        <input type="text" id="capture-search" placeholder="Search by File Number or Container Number" style="flex:1; height:38px; border-radius:6px; border:1.5px solid var(--input-border); padding:0 12px; font-size:13px;">
+        <button class="btn btn-primary" onclick="searchPaymentCapture()">&#128269; Search</button>
+      </div>
+      <div id="capture-file-label" style="font-size:12.5px; color:var(--text-soft); margin-bottom:10px;"></div>
+      <div style="overflow-x:auto;">
+        <table style="width:100%; border-collapse:collapse; font-size:12px;" id="capture-table">
+          <thead>
+            <tr style="background:var(--bg); text-align:left;">
+              <th style="padding:8px;">Container</th>
+              <th style="padding:8px;">GF Invoice</th>
+              <th style="padding:8px;">GF Inv Value</th>
+              <th style="padding:8px;">Transporter Inv</th>
+              <th style="padding:8px;">Transporter Total</th>
+              <th style="padding:8px;">Invoice Date</th>
+              <th style="padding:8px;">Paid</th>
+              <th style="padding:8px;">Remarks</th>
+            </tr>
+          </thead>
+          <tbody id="capture-rows"></tbody>
+        </table>
+      </div>
+      <button class="btn btn-primary" style="margin-top:16px;" onclick="savePaymentCapture()"><span class="btn-icon">&#128190;</span>Save Payment Details</button>
+    </div>
+
+    <div class="panel accent-top" id="fpanel-report" style="display:none;">
+      <div class="panel-title"><span class="bar"></span>Payment Report</div>
+      <div class="detail-cards">
+        <div class="detail-card">
+          <div class="field"><label>Transporter</label>
+            <select id="fin-report-transporter"><option value="">— All Transporters —</option></select>
+          </div>
+          <div class="field"><label>Status</label>
+            <select id="fin-report-status">
+              <option value="All">All Invoices</option>
+              <option value="Paid">Paid</option>
+              <option value="Unpaid">Unpaid</option>
+            </select>
+          </div>
+        </div>
+        <div class="detail-card">
+          <div class="field"><label>From Date (Invoice Date)</label><input type="date" id="fin-report-from-date"></div>
+          <div class="field"><label>To Date (Invoice Date)</label><input type="date" id="fin-report-to-date"></div>
+          <div class="field"><label>Container Search (optional, overrides the above)</label><input type="text" id="fin-report-container-search" placeholder="e.g. MSBU1320254"></div>
+        </div>
+      </div>
+      <button class="btn btn-primary" onclick="generatePaymentReport()"><span class="btn-icon">&#128269;</span>Generate Report</button>
+
+      <div id="fin-report-output" style="display:none; margin-top:22px;">
+        <div style="overflow-x:auto;">
+          <table style="width:100%; border-collapse:collapse; font-size:11.5px;" id="fin-report-table">
+            <thead>
+              <tr style="background:var(--header); color:#fff; text-align:left;">
+                <th style="padding:7px;">File</th>
+                <th style="padding:7px;">Client</th>
+                <th style="padding:7px;">Container</th>
+                <th style="padding:7px;">Transporter</th>
+                <th style="padding:7px;">GF Invoice</th>
+                <th style="padding:7px; text-align:right;">GF Value</th>
+                <th style="padding:7px;">Trans. Invoice</th>
+                <th style="padding:7px; text-align:right;">Trans. Total</th>
+                <th style="padding:7px;">Invoice Date</th>
+                <th style="padding:7px;">Paid</th>
+                <th style="padding:7px;">Remarks</th>
+              </tr>
+            </thead>
+            <tbody id="fin-report-rows"></tbody>
+            <tfoot>
+              <tr style="font-weight:700; border-top:2px solid var(--header);">
+                <td colspan="5" style="padding:7px; text-align:right;">Grand Total:</td>
+                <td id="fin-report-total-gf" style="padding:7px; text-align:right;"></td>
+                <td></td>
+                <td id="fin-report-total-trans" style="padding:7px; text-align:right;"></td>
+                <td colspan="3"></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+        <div style="display:flex; gap:10px; margin-top:16px;">
+          <button class="btn btn-primary" onclick="savePaymentReportPDF()"><span class="btn-icon">&#128196;</span>Save as PDF</button>
+          <button class="btn btn-secondary" onclick="window.print()"><span class="btn-icon">&#128424;</span>Print</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  </div>
 </div>
 </div>
 
@@ -767,7 +880,7 @@
 
   function handleFinancialsClick() {
     if (!isSuperUser) { showAlert('Access Restricted', 'Only super users have access to Financials.'); return; }
-    showToast('Opening Financials...');
+    showView('financials');
   }
 
   /* ── Company Setup: real Supabase-backed lists ── */
@@ -818,15 +931,27 @@
     });
   }
 
+  function showFinTab(name) {
+    ['capture', 'report'].forEach(function(n) {
+      document.getElementById('fpanel-' + n).style.display = (n === name) ? 'block' : 'none';
+      document.getElementById('ftab-' + n).classList.toggle('active', n === name);
+    });
+  }
+
   function showView(name) {
     document.getElementById('registration-topbar').style.display = (name === 'registration') ? 'flex' : 'none';
     document.getElementById('view-registration').style.display = (name === 'registration') ? 'block' : 'none';
     document.getElementById('view-reports').style.display = (name === 'reports') ? 'block' : 'none';
+    document.getElementById('view-financials').style.display = (name === 'financials') ? 'block' : 'none';
     document.getElementById('nav-registration').classList.toggle('active', name === 'registration');
     document.getElementById('nav-reports').classList.toggle('active', name === 'reports');
+    document.getElementById('nav-financials').classList.toggle('active', name === 'financials');
     if (name === 'reports') {
       populateReportDropdown('clients', 'name', 'report-client', 'Client');
       populateReportDropdown('transporters', 'name', 'report-transporter', 'Transporter');
+    }
+    if (name === 'financials') {
+      populateReportDropdown('transporters', 'name', 'fin-report-transporter', 'Transporter');
     }
   }
 
@@ -1142,6 +1267,191 @@
 
     const safeName = function(s) { return s.replace(/[\/\\:*?"<>|]/g, '-').trim(); };
     doc.save(safeName('Internal Report - ' + status + ' - ' + fromDate + ' to ' + toDate) + '.pdf');
+  }
+
+  /* ── Financials: Capture Payment Details ── */
+  let captureContainers = [];
+
+  function searchPaymentCapture() {
+    const term = document.getElementById('capture-search').value.trim();
+    if (!term) { showToast('Enter a File Number or Container Number'); return; }
+
+    sbClient.from('shipment_files').select('id, file_number').ilike('file_number', '%' + term + '%').limit(1).then(function(fileRes) {
+      if (fileRes.data && fileRes.data.length) {
+        loadCaptureFile(fileRes.data[0].id, fileRes.data[0].file_number);
+        return;
+      }
+      sbClient.from('containers').select('file_id').ilike('container_number', '%' + term + '%').limit(1).then(function(cRes) {
+        if (cRes.error || !cRes.data.length) { showAlert('Not Found', 'No file or container matching "' + term + '".'); return; }
+        sbClient.from('shipment_files').select('file_number').eq('id', cRes.data[0].file_id).single().then(function(fRes) {
+          loadCaptureFile(cRes.data[0].file_id, fRes.data ? fRes.data.file_number : '—');
+        });
+      });
+    });
+  }
+
+  function loadCaptureFile(fileId, fileNumber) {
+    sbClient.from('containers').select('*').eq('file_id', fileId).order('created_at').then(function(res) {
+      if (res.error) { showAlert('Could Not Load', res.error.message); return; }
+      captureContainers = res.data || [];
+      document.getElementById('capture-file-label').textContent = 'File: ' + fileNumber + '  (' + captureContainers.length + ' container' + (captureContainers.length === 1 ? '' : 's') + ')';
+      renderCaptureRows();
+    });
+  }
+
+  function renderCaptureRows() {
+    const tbody = document.getElementById('capture-rows');
+    tbody.innerHTML = '';
+    captureContainers.forEach(function(c, idx) {
+      const tr = document.createElement('tr');
+      tr.style.borderBottom = '1px solid var(--border)';
+      tr.innerHTML =
+        '<td style="padding:7px; font-family:monospace;">' + (c.container_number || '—') + '</td>' +
+        '<td style="padding:4px;"><input data-f="gf_invoice" data-i="' + idx + '" value="' + (c.gf_invoice || '') + '" style="width:100px; padding:4px; border:1px solid var(--input-border); border-radius:4px;"></td>' +
+        '<td style="padding:4px;"><input data-f="gf_inv_value" data-i="' + idx + '" value="' + (c.gf_inv_value || '') + '" style="width:90px; padding:4px; border:1px solid var(--input-border); border-radius:4px;"></td>' +
+        '<td style="padding:4px;"><input data-f="transporter_invoice" data-i="' + idx + '" value="' + (c.transporter_invoice || '') + '" style="width:100px; padding:4px; border:1px solid var(--input-border); border-radius:4px;"></td>' +
+        '<td style="padding:4px;"><input data-f="transporter_total" data-i="' + idx + '" value="' + (c.transporter_total || '') + '" style="width:90px; padding:4px; border:1px solid var(--input-border); border-radius:4px;"></td>' +
+        '<td style="padding:4px;"><input type="date" data-f="invoice_date" data-i="' + idx + '" value="' + (c.invoice_date || '') + '" style="padding:4px; border:1px solid var(--input-border); border-radius:4px;"></td>' +
+        '<td style="padding:4px; text-align:center;"><input type="checkbox" class="paid-checkbox" data-f="paid" data-i="' + idx + '" ' + (c.paid ? 'checked' : '') + '></td>' +
+        '<td style="padding:4px;"><input data-f="payment_remarks" data-i="' + idx + '" value="' + (c.payment_remarks || '') + '" style="width:140px; padding:4px; border:1px solid var(--input-border); border-radius:4px;"></td>';
+      tbody.appendChild(tr);
+    });
+  }
+
+  function savePaymentCapture() {
+    const inputs = document.querySelectorAll('#capture-rows [data-f]');
+    const updates = {};
+    inputs.forEach(function(el) {
+      const i = el.dataset.i, f = el.dataset.f;
+      if (!updates[i]) updates[i] = {};
+      updates[i][f] = f === 'paid' ? el.checked : el.value;
+    });
+    const promises = Object.keys(updates).map(function(i) {
+      const c = captureContainers[i];
+      const u = updates[i];
+      const payload = {
+        gf_invoice: u.gf_invoice || null,
+        gf_inv_value: u.gf_inv_value ? Number(u.gf_inv_value) : null,
+        transporter_invoice: u.transporter_invoice || null,
+        transporter_total: u.transporter_total ? Number(u.transporter_total) : null,
+        invoice_date: u.invoice_date || null,
+        paid: !!u.paid,
+        payment_remarks: u.payment_remarks || null
+      };
+      return sbClient.from('containers').update(payload).eq('id', c.id);
+    });
+    Promise.all(promises).then(function(results) {
+      const failed = results.find(function(r) { return r.error; });
+      if (failed) { showAlert('Could Not Save', failed.error.message); return; }
+      showAlert('Geofit Logistics Hub', 'Payment details saved successfully.');
+    });
+  }
+
+  /* ── Financials: Payment Report ── */
+  let lastPaymentReportRows = [];
+  let lastPaymentReportFilters = {};
+
+  function generatePaymentReport() {
+    const transporter = document.getElementById('fin-report-transporter').value;
+    const status = document.getElementById('fin-report-status').value;
+    const fromDate = document.getElementById('fin-report-from-date').value;
+    const toDate = document.getElementById('fin-report-to-date').value;
+    const containerSearch = document.getElementById('fin-report-container-search').value.trim();
+
+    let query = sbClient.from('containers')
+      .select('container_number, gf_invoice, gf_inv_value, transporter_invoice, transporter_total, invoice_date, paid, payment_remarks, shipment_files!inner(file_number, client_name, transporter)');
+
+    if (containerSearch) {
+      query = query.ilike('container_number', '%' + containerSearch + '%');
+    } else {
+      if (transporter) query = query.eq('shipment_files.transporter', transporter);
+      if (status === 'Paid') query = query.eq('paid', true);
+      if (status === 'Unpaid') query = query.eq('paid', false);
+      if (fromDate) query = query.gte('invoice_date', fromDate);
+      if (toDate) query = query.lte('invoice_date', toDate);
+    }
+
+    query.then(function(res) {
+      if (res.error) { showAlert('Could Not Generate Report', res.error.message); return; }
+      if (!res.data || !res.data.length) {
+        showAlert('No Matching Invoices', 'Nothing matches those filters.');
+        document.getElementById('fin-report-output').style.display = 'none';
+        return;
+      }
+      lastPaymentReportRows = res.data;
+      lastPaymentReportFilters = { transporter: transporter || 'All Transporters', status: status, fromDate: fromDate, toDate: toDate, containerSearch: containerSearch };
+      renderPaymentReportTable(res.data);
+    });
+  }
+
+  function renderPaymentReportTable(rows) {
+    const tbody = document.getElementById('fin-report-rows');
+    tbody.innerHTML = '';
+    let totalGf = 0, totalTrans = 0;
+    rows.forEach(function(r, i) {
+      const f = r.shipment_files;
+      totalGf += Number(r.gf_inv_value) || 0;
+      totalTrans += Number(r.transporter_total) || 0;
+      const tr = document.createElement('tr');
+      tr.style.background = i % 2 === 1 ? '#f9fafb' : '#fff';
+      tr.style.borderBottom = '1px solid var(--border)';
+      tr.innerHTML =
+        '<td style="padding:6px;">' + (f.file_number || '—') + '</td>' +
+        '<td style="padding:6px;">' + (f.client_name || '—') + '</td>' +
+        '<td style="padding:6px; font-family:monospace;">' + (r.container_number || '—') + '</td>' +
+        '<td style="padding:6px;">' + (f.transporter || '—') + '</td>' +
+        '<td style="padding:6px;">' + (r.gf_invoice || '—') + '</td>' +
+        '<td style="padding:6px; text-align:right;">' + (r.gf_inv_value != null ? Number(r.gf_inv_value).toFixed(2) : '—') + '</td>' +
+        '<td style="padding:6px;">' + (r.transporter_invoice || '—') + '</td>' +
+        '<td style="padding:6px; text-align:right;">' + (r.transporter_total != null ? Number(r.transporter_total).toFixed(2) : '—') + '</td>' +
+        '<td style="padding:6px;">' + (r.invoice_date ? fmtReportDate(r.invoice_date) : '—') + '</td>' +
+        '<td style="padding:6px;">' + (r.paid ? '<span style="color:#16a34a; font-weight:700;">Paid</span>' : '<span style="color:#dc2626;">Unpaid</span>') + '</td>' +
+        '<td style="padding:6px;">' + (r.payment_remarks || '—') + '</td>';
+      tbody.appendChild(tr);
+    });
+    document.getElementById('fin-report-total-gf').textContent = totalGf.toFixed(2);
+    document.getElementById('fin-report-total-trans').textContent = totalTrans.toFixed(2);
+    document.getElementById('fin-report-output').style.display = 'block';
+  }
+
+  function savePaymentReportPDF() {
+    if (!lastPaymentReportRows.length) { showToast('Generate the report first'); return; }
+    if (!window.jspdf || !window.jspdf.jsPDF) { showAlert('PDF Tool Not Loaded', 'The PDF library did not load. Try refreshing the page.'); return; }
+    const doc = new window.jspdf.jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    const MARGIN = 10, RIGHT_EDGE = 297 - MARGIN;
+
+    let y = 16;
+    doc.setFontSize(16); doc.setFont(undefined, 'bold'); doc.setTextColor(0, 0, 0);
+    doc.text('Geofit Payment Report', MARGIN, y);
+    y += 7;
+    doc.setFontSize(10); doc.setFont(undefined, 'normal'); doc.setTextColor(100, 108, 118);
+    doc.text(lastPaymentReportFilters.transporter + '  |  Status: ' + lastPaymentReportFilters.status + '  |  Printed: ' + printedStampNow(), MARGIN, y);
+    y += 6;
+
+    const colW = [20, 24, 26, 22, 20, 18, 22, 20, 18, 14, 0];
+    colW[10] = (RIGHT_EDGE - MARGIN) - colW.slice(0, 10).reduce(function(a, b) { return a + b; }, 0);
+    const headers = ['File', 'Client', 'Container', 'Transporter', 'GF Invoice', 'GF Value', 'Trans. Inv', 'Trans. Total', 'Inv. Date', 'Paid', 'Remarks'];
+
+    let totalGf = 0, totalTrans = 0;
+    const tableRows = lastPaymentReportRows.map(function(r) {
+      const f = r.shipment_files;
+      totalGf += Number(r.gf_inv_value) || 0;
+      totalTrans += Number(r.transporter_total) || 0;
+      return [f.file_number || '—', f.client_name || '—', r.container_number || '—', f.transporter || '—',
+        r.gf_invoice || '—', r.gf_inv_value != null ? Number(r.gf_inv_value).toFixed(2) : '—',
+        r.transporter_invoice || '—', r.transporter_total != null ? Number(r.transporter_total).toFixed(2) : '—',
+        r.invoice_date ? fmtReportDate(r.invoice_date) : '—', r.paid ? 'Paid' : 'Unpaid', r.payment_remarks || '—'];
+    });
+
+    drawReportTable(doc, { margin: MARGIN, rightEdge: RIGHT_EDGE, colW: colW, headers: headers, rows: tableRows, startY: y, pageBottom: 185, restartY: 16, footerY: 196 });
+
+    doc.setFontSize(10); doc.setFont(undefined, 'bold'); doc.setTextColor(0, 0, 0);
+    doc.text('Grand Total — GF Value: ' + totalGf.toFixed(2) + '   |   Transporter Total: ' + totalTrans.toFixed(2), MARGIN, 190);
+
+    const now = new Date();
+    const dateStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+    const safeName = function(s) { return s.replace(/[\/\\:*?"<>|]/g, '-').trim(); };
+    doc.save(safeName('Payment Report - ' + lastPaymentReportFilters.transporter + ' - ' + dateStr) + '.pdf');
   }
 
   function openCompanySetup() {
