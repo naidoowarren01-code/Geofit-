@@ -628,15 +628,18 @@
       </div>
       <div id="capture-file-label" style="font-size:12.5px; color:var(--text-soft); margin-bottom:10px;"></div>
       <div style="overflow-x:auto;">
-        <table style="width:100%; min-width:1020px; table-layout:auto; border-collapse:collapse; font-size:12px;" id="capture-table">
+        <table style="width:100%; min-width:1600px; table-layout:auto; border-collapse:collapse; font-size:12px;" id="capture-table">
           <thead>
             <tr style="background:var(--bg); text-align:left;">
-              <th style="padding:8px; white-space:nowrap; overflow:visible; text-overflow:clip;">Container</th>
-              <th style="padding:8px; white-space:nowrap; overflow:visible; text-overflow:clip;">GF Invoice</th>
+              <th style="padding:8px; white-space:nowrap; overflow:visible; text-overflow:clip;">File Number</th>
+              <th style="padding:8px; white-space:nowrap; overflow:visible; text-overflow:clip;">Client</th>
+              <th style="padding:8px; white-space:nowrap; overflow:visible; text-overflow:clip;">GF Inv</th>
+              <th style="padding:8px; white-space:nowrap; overflow:visible; text-overflow:clip;">Container No.</th>
+              <th style="padding:8px; white-space:nowrap; overflow:visible; text-overflow:clip;">Delivery Address</th>
               <th style="padding:8px; white-space:nowrap; overflow:visible; text-overflow:clip;">GF Inv Value</th>
-              <th style="padding:8px; white-space:nowrap; overflow:visible; text-overflow:clip;">Transporter</th>
-              <th style="padding:8px; white-space:nowrap; overflow:visible; text-overflow:clip;">Trans. Inv</th>
-              <th style="padding:8px; white-space:nowrap; overflow:visible; text-overflow:clip;">Trans. Total</th>
+              <th style="padding:8px; white-space:nowrap; overflow:visible; text-overflow:clip;">Transporter's Name</th>
+              <th style="padding:8px; white-space:nowrap; overflow:visible; text-overflow:clip;">Transporter's Inv</th>
+              <th style="padding:8px; white-space:nowrap; overflow:visible; text-overflow:clip;">Transporter's Total</th>
               <th style="padding:8px; white-space:nowrap; overflow:visible; text-overflow:clip;">Invoice Date</th>
               <th style="padding:8px; white-space:nowrap; overflow:visible; text-overflow:clip;">Paid</th>
               <th style="padding:8px; white-space:nowrap; overflow:visible; text-overflow:clip;">Remarks</th>
@@ -1282,30 +1285,33 @@
     });
   }
 
+  let captureFileInfo = { file_number: '', client_name: '', delivery_address: '', transporter: '' };
+
   function searchPaymentCapture() {
     const term = document.getElementById('capture-search').value.trim();
     if (!term) { showToast('Enter a File Number or Container Number'); return; }
+    const fileFields = 'id, file_number, client_name, delivery_address, transporter';
 
-    sbClient.from('shipment_files').select('id, file_number, transporter').ilike('file_number', '%' + term + '%').limit(1).then(function(fileRes) {
+    sbClient.from('shipment_files').select(fileFields).ilike('file_number', '%' + term + '%').limit(1).then(function(fileRes) {
       if (fileRes.data && fileRes.data.length) {
-        loadCaptureFile(fileRes.data[0].id, fileRes.data[0].file_number, fileRes.data[0].transporter);
+        loadCaptureFile(fileRes.data[0]);
         return;
       }
       sbClient.from('containers').select('file_id').ilike('container_number', '%' + term + '%').limit(1).then(function(cRes) {
         if (cRes.error || !cRes.data.length) { showAlert('Not Found', 'No file or container matching "' + term + '".'); return; }
-        sbClient.from('shipment_files').select('file_number, transporter').eq('id', cRes.data[0].file_id).single().then(function(fRes) {
-          loadCaptureFile(cRes.data[0].file_id, fRes.data ? fRes.data.file_number : '—', fRes.data ? fRes.data.transporter : '');
+        sbClient.from('shipment_files').select(fileFields).eq('id', cRes.data[0].file_id).single().then(function(fRes) {
+          loadCaptureFile(fRes.data || { id: cRes.data[0].file_id });
         });
       });
     });
   }
 
-  function loadCaptureFile(fileId, fileNumber, fileTransporter) {
-    captureFileDefaultTransporter = fileTransporter || '';
-    sbClient.from('containers').select('*').eq('file_id', fileId).order('created_at').then(function(res) {
+  function loadCaptureFile(file) {
+    captureFileInfo = file;
+    sbClient.from('containers').select('*').eq('file_id', file.id).order('created_at').then(function(res) {
       if (res.error) { showAlert('Could Not Load', res.error.message); return; }
       captureContainers = res.data || [];
-      document.getElementById('capture-file-label').textContent = 'File: ' + fileNumber + '  (' + captureContainers.length + ' container' + (captureContainers.length === 1 ? '' : 's') + ')';
+      document.getElementById('capture-file-label').textContent = 'File: ' + (file.file_number || '—') + '  (' + captureContainers.length + ' container' + (captureContainers.length === 1 ? '' : 's') + ')';
       renderCaptureRows();
     });
   }
@@ -1324,12 +1330,15 @@
     const tbody = document.getElementById('capture-rows');
     tbody.innerHTML = '';
     captureContainers.forEach(function(c, idx) {
-      const selectedTransporter = c.transporter_name || captureFileDefaultTransporter || '';
+      const selectedTransporter = c.transporter_name || captureFileInfo.transporter || '';
       const tr = document.createElement('tr');
       tr.style.borderBottom = '1px solid var(--border)';
       tr.innerHTML =
-        '<td style="padding:7px; font-family:monospace;">' + (c.container_number || '—') + '</td>' +
-        '<td style="padding:4px;"><input data-f="gf_invoice" data-i="' + idx + '" value="' + (c.gf_invoice || '') + '" style="width:100px; padding:4px; border:1px solid var(--input-border); border-radius:4px;"></td>' +
+        '<td style="padding:7px; white-space:nowrap;">' + (captureFileInfo.file_number || '—') + '</td>' +
+        '<td style="padding:7px; white-space:nowrap;">' + (captureFileInfo.client_name || '—') + '</td>' +
+        '<td style="padding:4px;"><input data-f="gf_invoice" data-i="' + idx + '" value="' + (c.gf_invoice || '') + '" style="width:90px; padding:4px; border:1px solid var(--input-border); border-radius:4px;"></td>' +
+        '<td style="padding:7px; font-family:monospace; white-space:nowrap;">' + (c.container_number || '—') + '</td>' +
+        '<td style="padding:7px; max-width:180px;">' + (captureFileInfo.delivery_address || '—') + '</td>' +
         '<td style="padding:4px;"><input data-f="gf_inv_value" data-i="' + idx + '" value="' + (c.gf_inv_value || '') + '" style="width:90px; padding:4px; border:1px solid var(--input-border); border-radius:4px;"></td>' +
         '<td style="padding:4px;">' + buildTransporterSelectHTML(idx, selectedTransporter) + '</td>' +
         '<td style="padding:4px;"><input data-f="transporter_invoice" data-i="' + idx + '" value="' + (c.transporter_invoice || '') + '" style="width:100px; padding:4px; border:1px solid var(--input-border); border-radius:4px;"></td>' +
@@ -1339,6 +1348,14 @@
         '<td style="padding:4px;"><input data-f="payment_remarks" data-i="' + idx + '" value="' + (c.payment_remarks || '') + '" style="width:140px; padding:4px; border:1px solid var(--input-border); border-radius:4px;"></td>';
       tbody.appendChild(tr);
     });
+  }
+
+  function clearPaymentCapture() {
+    document.getElementById('capture-search').value = '';
+    document.getElementById('capture-file-label').textContent = '';
+    document.getElementById('capture-rows').innerHTML = '';
+    captureContainers = [];
+    captureFileInfo = { file_number: '', client_name: '', delivery_address: '', transporter: '' };
   }
 
   function savePaymentCapture() {
@@ -1367,7 +1384,8 @@
     Promise.all(promises).then(function(results) {
       const failed = results.find(function(r) { return r.error; });
       if (failed) { showAlert('Could Not Save', failed.error.message); return; }
-      showAlert('Geofit Logistics Hub', 'Payment details saved successfully.');
+      clearPaymentCapture();
+      showAlert('Geofit Logistics Hub', 'Payment details saved successfully. Ready for the next transaction.');
     });
   }
 
