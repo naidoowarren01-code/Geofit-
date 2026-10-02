@@ -628,12 +628,13 @@
       </div>
       <div id="capture-file-label" style="font-size:12.5px; color:var(--text-soft); margin-bottom:10px;"></div>
       <div style="overflow-x:auto;">
-        <table style="width:100%; min-width:900px; table-layout:auto; border-collapse:collapse; font-size:12px;" id="capture-table">
+        <table style="width:100%; min-width:1020px; table-layout:auto; border-collapse:collapse; font-size:12px;" id="capture-table">
           <thead>
             <tr style="background:var(--bg); text-align:left;">
               <th style="padding:8px; white-space:nowrap; overflow:visible; text-overflow:clip;">Container</th>
               <th style="padding:8px; white-space:nowrap; overflow:visible; text-overflow:clip;">GF Invoice</th>
               <th style="padding:8px; white-space:nowrap; overflow:visible; text-overflow:clip;">GF Inv Value</th>
+              <th style="padding:8px; white-space:nowrap; overflow:visible; text-overflow:clip;">Transporter</th>
               <th style="padding:8px; white-space:nowrap; overflow:visible; text-overflow:clip;">Trans. Inv</th>
               <th style="padding:8px; white-space:nowrap; overflow:visible; text-overflow:clip;">Trans. Total</th>
               <th style="padding:8px; white-space:nowrap; overflow:visible; text-overflow:clip;">Invoice Date</th>
@@ -952,6 +953,7 @@
     }
     if (name === 'financials') {
       populateReportDropdown('transporters', 'name', 'fin-report-transporter', 'Transporter');
+      loadCaptureTransporterOptions();
     }
   }
 
@@ -1271,26 +1273,35 @@
 
   /* ── Financials: Capture Payment Details ── */
   let captureContainers = [];
+  let captureTransporterOptions = [];
+  let captureFileDefaultTransporter = '';
+
+  function loadCaptureTransporterOptions() {
+    sbClient.from('transporters').select('name').order('name').then(function(res) {
+      captureTransporterOptions = (res.data || []).map(function(r) { return r.name; });
+    });
+  }
 
   function searchPaymentCapture() {
     const term = document.getElementById('capture-search').value.trim();
     if (!term) { showToast('Enter a File Number or Container Number'); return; }
 
-    sbClient.from('shipment_files').select('id, file_number').ilike('file_number', '%' + term + '%').limit(1).then(function(fileRes) {
+    sbClient.from('shipment_files').select('id, file_number, transporter').ilike('file_number', '%' + term + '%').limit(1).then(function(fileRes) {
       if (fileRes.data && fileRes.data.length) {
-        loadCaptureFile(fileRes.data[0].id, fileRes.data[0].file_number);
+        loadCaptureFile(fileRes.data[0].id, fileRes.data[0].file_number, fileRes.data[0].transporter);
         return;
       }
       sbClient.from('containers').select('file_id').ilike('container_number', '%' + term + '%').limit(1).then(function(cRes) {
         if (cRes.error || !cRes.data.length) { showAlert('Not Found', 'No file or container matching "' + term + '".'); return; }
-        sbClient.from('shipment_files').select('file_number').eq('id', cRes.data[0].file_id).single().then(function(fRes) {
-          loadCaptureFile(cRes.data[0].file_id, fRes.data ? fRes.data.file_number : '—');
+        sbClient.from('shipment_files').select('file_number, transporter').eq('id', cRes.data[0].file_id).single().then(function(fRes) {
+          loadCaptureFile(cRes.data[0].file_id, fRes.data ? fRes.data.file_number : '—', fRes.data ? fRes.data.transporter : '');
         });
       });
     });
   }
 
-  function loadCaptureFile(fileId, fileNumber) {
+  function loadCaptureFile(fileId, fileNumber, fileTransporter) {
+    captureFileDefaultTransporter = fileTransporter || '';
     sbClient.from('containers').select('*').eq('file_id', fileId).order('created_at').then(function(res) {
       if (res.error) { showAlert('Could Not Load', res.error.message); return; }
       captureContainers = res.data || [];
@@ -1299,16 +1310,28 @@
     });
   }
 
+  function buildTransporterSelectHTML(idx, selectedValue) {
+    let html = '<select data-f="transporter_name" data-i="' + idx + '" style="padding:4px; border:1px solid var(--input-border); border-radius:4px; max-width:130px;">';
+    html += '<option value=""' + (!selectedValue ? ' selected' : '') + '>— Select —</option>';
+    captureTransporterOptions.forEach(function(name) {
+      html += '<option value="' + name + '"' + (name === selectedValue ? ' selected' : '') + '>' + name + '</option>';
+    });
+    html += '</select>';
+    return html;
+  }
+
   function renderCaptureRows() {
     const tbody = document.getElementById('capture-rows');
     tbody.innerHTML = '';
     captureContainers.forEach(function(c, idx) {
+      const selectedTransporter = c.transporter_name || captureFileDefaultTransporter || '';
       const tr = document.createElement('tr');
       tr.style.borderBottom = '1px solid var(--border)';
       tr.innerHTML =
         '<td style="padding:7px; font-family:monospace;">' + (c.container_number || '—') + '</td>' +
         '<td style="padding:4px;"><input data-f="gf_invoice" data-i="' + idx + '" value="' + (c.gf_invoice || '') + '" style="width:100px; padding:4px; border:1px solid var(--input-border); border-radius:4px;"></td>' +
         '<td style="padding:4px;"><input data-f="gf_inv_value" data-i="' + idx + '" value="' + (c.gf_inv_value || '') + '" style="width:90px; padding:4px; border:1px solid var(--input-border); border-radius:4px;"></td>' +
+        '<td style="padding:4px;">' + buildTransporterSelectHTML(idx, selectedTransporter) + '</td>' +
         '<td style="padding:4px;"><input data-f="transporter_invoice" data-i="' + idx + '" value="' + (c.transporter_invoice || '') + '" style="width:100px; padding:4px; border:1px solid var(--input-border); border-radius:4px;"></td>' +
         '<td style="padding:4px;"><input data-f="transporter_total" data-i="' + idx + '" value="' + (c.transporter_total || '') + '" style="width:90px; padding:4px; border:1px solid var(--input-border); border-radius:4px;"></td>' +
         '<td style="padding:4px;"><input type="date" data-f="invoice_date" data-i="' + idx + '" value="' + (c.invoice_date || '') + '" style="padding:4px; border:1px solid var(--input-border); border-radius:4px;"></td>' +
@@ -1332,6 +1355,7 @@
       const payload = {
         gf_invoice: u.gf_invoice || null,
         gf_inv_value: u.gf_inv_value ? Number(u.gf_inv_value) : null,
+        transporter_name: u.transporter_name || null,
         transporter_invoice: u.transporter_invoice || null,
         transporter_total: u.transporter_total ? Number(u.transporter_total) : null,
         invoice_date: u.invoice_date || null,
@@ -1359,12 +1383,12 @@
     const containerSearch = document.getElementById('fin-report-container-search').value.trim();
 
     let query = sbClient.from('containers')
-      .select('container_number, gf_invoice, gf_inv_value, transporter_invoice, transporter_total, invoice_date, paid, payment_remarks, shipment_files!inner(file_number, client_name, transporter)');
+      .select('container_number, gf_invoice, gf_inv_value, transporter_name, transporter_invoice, transporter_total, invoice_date, paid, payment_remarks, shipment_files!inner(file_number, client_name, transporter)');
 
     if (containerSearch) {
       query = query.ilike('container_number', '%' + containerSearch + '%');
     } else {
-      if (transporter) query = query.eq('shipment_files.transporter', transporter);
+      if (transporter) query = query.eq('transporter_name', transporter);
       if (status === 'Paid') query = query.eq('paid', true);
       if (status === 'Unpaid') query = query.eq('paid', false);
       if (fromDate) query = query.gte('invoice_date', fromDate);
@@ -1399,7 +1423,7 @@
         '<td style="padding:6px;">' + (f.file_number || '—') + '</td>' +
         '<td style="padding:6px;">' + (f.client_name || '—') + '</td>' +
         '<td style="padding:6px; font-family:monospace;">' + (r.container_number || '—') + '</td>' +
-        '<td style="padding:6px;">' + (f.transporter || '—') + '</td>' +
+        '<td style="padding:6px;">' + (r.transporter_name || f.transporter || '—') + '</td>' +
         '<td style="padding:6px;">' + (r.gf_invoice || '—') + '</td>' +
         '<td style="padding:6px; text-align:right;">' + (r.gf_inv_value != null ? Number(r.gf_inv_value).toFixed(2) : '—') + '</td>' +
         '<td style="padding:6px;">' + (r.transporter_invoice || '—') + '</td>' +
@@ -1437,7 +1461,7 @@
       const f = r.shipment_files;
       totalGf += Number(r.gf_inv_value) || 0;
       totalTrans += Number(r.transporter_total) || 0;
-      return [f.file_number || '—', f.client_name || '—', r.container_number || '—', f.transporter || '—',
+      return [f.file_number || '—', f.client_name || '—', r.container_number || '—', r.transporter_name || f.transporter || '—',
         r.gf_invoice || '—', r.gf_inv_value != null ? Number(r.gf_inv_value).toFixed(2) : '—',
         r.transporter_invoice || '—', r.transporter_total != null ? Number(r.transporter_total).toFixed(2) : '—',
         r.invoice_date ? fmtReportDate(r.invoice_date) : '—', r.paid ? 'Paid' : 'Unpaid', r.payment_remarks || '—'];
