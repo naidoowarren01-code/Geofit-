@@ -622,9 +622,13 @@
 
     <div class="panel accent-top" id="fpanel-capture">
       <div class="panel-title"><span class="bar"></span>Capture Payment Details</div>
+      <div style="font-size:12.5px; color:var(--text-soft); margin-bottom:16px;">
+        Every unpaid container shows below automatically — no searching needed. Tick Paid once settled and it comes off this list after you save.
+      </div>
       <div style="display:flex; gap:10px; margin-bottom:16px;">
-        <input type="text" id="capture-search" placeholder="Search by File Number or Container Number" style="flex:1; height:38px; border-radius:6px; border:1.5px solid var(--input-border); padding:0 12px; font-size:13px;">
-        <button class="btn btn-primary" onclick="searchPaymentCapture()">&#128269; Search</button>
+        <input type="text" id="capture-search" placeholder="Optional: narrow down by File Number or Container Number (also finds already-paid records)" style="flex:1; height:38px; border-radius:6px; border:1.5px solid var(--input-border); padding:0 12px; font-size:13px;">
+        <button class="btn btn-primary" onclick="searchPaymentCapture()">&#128269; Filter</button>
+        <button class="btn btn-secondary" onclick="document.getElementById('capture-search').value=''; loadCaptureQueue();">Show All Unpaid</button>
       </div>
       <div id="capture-file-label" style="font-size:12.5px; color:var(--text-soft); margin-bottom:10px;"></div>
       <div style="overflow-x:auto;">
@@ -957,6 +961,8 @@
     if (name === 'financials') {
       populateReportDropdown('transporters', 'name', 'fin-report-transporter', 'Transporter');
       loadCaptureTransporterOptions();
+      document.getElementById('capture-search').value = '';
+      loadCaptureQueue();
     }
   }
 
@@ -1277,7 +1283,6 @@
   /* ── Financials: Capture Payment Details ── */
   let captureContainers = [];
   let captureTransporterOptions = [];
-  let captureFileDefaultTransporter = '';
 
   function loadCaptureTransporterOptions() {
     sbClient.from('transporters').select('name').order('name').then(function(res) {
@@ -1285,36 +1290,35 @@
     });
   }
 
-  let captureFileInfo = { file_number: '', client_name: '', delivery_address: '', transporter: '' };
-
-  function searchPaymentCapture() {
+  // Loads automatically the moment Financials opens — every unpaid container,
+  // across every file, no searching required. Typing in the search box
+  // narrows this down (and, while searching, also reveals already-paid
+  // records so a specific one can still be found and corrected if needed).
+  function loadCaptureQueue() {
     const term = document.getElementById('capture-search').value.trim();
-    if (!term) { showToast('Enter a File Number or Container Number'); return; }
-    const fileFields = 'id, file_number, client_name, delivery_address, transporter';
+    let query = sbClient.from('containers')
+      .select('id, container_number, gf_invoice, gf_inv_value, transporter_name, transporter_invoice, transporter_total, invoice_date, paid, payment_remarks, file_id, shipment_files!inner(file_number, client_name, delivery_address, transporter)');
 
-    sbClient.from('shipment_files').select(fileFields).ilike('file_number', '%' + term + '%').limit(1).then(function(fileRes) {
-      if (fileRes.data && fileRes.data.length) {
-        loadCaptureFile(fileRes.data[0]);
-        return;
-      }
-      sbClient.from('containers').select('file_id').ilike('container_number', '%' + term + '%').limit(1).then(function(cRes) {
-        if (cRes.error || !cRes.data.length) { showAlert('Not Found', 'No file or container matching "' + term + '".'); return; }
-        sbClient.from('shipment_files').select(fileFields).eq('id', cRes.data[0].file_id).single().then(function(fRes) {
-          loadCaptureFile(fRes.data || { id: cRes.data[0].file_id });
-        });
-      });
-    });
-  }
+    if (term) {
+      query = query.or('container_number.ilike.%' + term + '%,shipment_files.file_number.ilike.%' + term + '%');
+    } else {
+      query = query.eq('paid', false);
+    }
 
-  function loadCaptureFile(file) {
-    captureFileInfo = file;
-    sbClient.from('containers').select('*').eq('file_id', file.id).order('created_at').then(function(res) {
+    query.then(function(res) {
       if (res.error) { showAlert('Could Not Load', res.error.message); return; }
       captureContainers = res.data || [];
-      document.getElementById('capture-file-label').textContent = 'File: ' + (file.file_number || '—') + '  (' + captureContainers.length + ' container' + (captureContainers.length === 1 ? '' : 's') + ')';
+      captureContainers.sort(function(a, b) {
+        const fa = (a.shipment_files.file_number || ''), fb = (b.shipment_files.file_number || '');
+        return fa < fb ? -1 : (fa > fb ? 1 : 0);
+      });
+      const label = term ? ('Matching "' + term + '": ') : 'Unpaid: ';
+      document.getElementById('capture-file-label').textContent = label + captureContainers.length + ' container' + (captureContainers.length === 1 ? '' : 's');
       renderCaptureRows();
     });
   }
+
+  function searchPaymentCapture() { loadCaptureQueue(); }
 
   function buildTransporterSelectHTML(idx, selectedValue) {
     let html = '<select data-f="transporter_name" data-i="' + idx + '" style="padding:4px; border:1px solid var(--input-border); border-radius:4px; max-width:130px;">';
@@ -1330,15 +1334,16 @@
     const tbody = document.getElementById('capture-rows');
     tbody.innerHTML = '';
     captureContainers.forEach(function(c, idx) {
-      const selectedTransporter = c.transporter_name || captureFileInfo.transporter || '';
+      const f = c.shipment_files;
+      const selectedTransporter = c.transporter_name || f.transporter || '';
       const tr = document.createElement('tr');
       tr.style.borderBottom = '1px solid var(--border)';
       tr.innerHTML =
-        '<td style="padding:7px; white-space:nowrap;">' + (captureFileInfo.file_number || '—') + '</td>' +
-        '<td style="padding:7px; white-space:nowrap;">' + (captureFileInfo.client_name || '—') + '</td>' +
+        '<td style="padding:7px; white-space:nowrap;">' + (f.file_number || '—') + '</td>' +
+        '<td style="padding:7px; white-space:nowrap;">' + (f.client_name || '—') + '</td>' +
         '<td style="padding:4px;"><input data-f="gf_invoice" data-i="' + idx + '" value="' + (c.gf_invoice || '') + '" style="width:90px; padding:4px; border:1px solid var(--input-border); border-radius:4px;"></td>' +
         '<td style="padding:7px; font-family:monospace; white-space:nowrap;">' + (c.container_number || '—') + '</td>' +
-        '<td style="padding:7px; max-width:180px;">' + (captureFileInfo.delivery_address || '—') + '</td>' +
+        '<td style="padding:7px; max-width:180px;">' + (f.delivery_address || '—') + '</td>' +
         '<td style="padding:4px;"><input data-f="gf_inv_value" data-i="' + idx + '" value="' + (c.gf_inv_value || '') + '" style="width:90px; padding:4px; border:1px solid var(--input-border); border-radius:4px;"></td>' +
         '<td style="padding:4px;">' + buildTransporterSelectHTML(idx, selectedTransporter) + '</td>' +
         '<td style="padding:4px;"><input data-f="transporter_invoice" data-i="' + idx + '" value="' + (c.transporter_invoice || '') + '" style="width:100px; padding:4px; border:1px solid var(--input-border); border-radius:4px;"></td>' +
@@ -1348,14 +1353,6 @@
         '<td style="padding:4px;"><input data-f="payment_remarks" data-i="' + idx + '" value="' + (c.payment_remarks || '') + '" style="width:140px; padding:4px; border:1px solid var(--input-border); border-radius:4px;"></td>';
       tbody.appendChild(tr);
     });
-  }
-
-  function clearPaymentCapture() {
-    document.getElementById('capture-search').value = '';
-    document.getElementById('capture-file-label').textContent = '';
-    document.getElementById('capture-rows').innerHTML = '';
-    captureContainers = [];
-    captureFileInfo = { file_number: '', client_name: '', delivery_address: '', transporter: '' };
   }
 
   function savePaymentCapture() {
@@ -1384,8 +1381,8 @@
     Promise.all(promises).then(function(results) {
       const failed = results.find(function(r) { return r.error; });
       if (failed) { showAlert('Could Not Save', failed.error.message); return; }
-      clearPaymentCapture();
-      showAlert('Geofit Logistics Hub', 'Payment details saved successfully. Ready for the next transaction.');
+      showToast('Saved — list refreshed');
+      loadCaptureQueue();
     });
   }
 
@@ -1688,7 +1685,55 @@
     return savePromise.then(function() {
       return saveAllContainers();
     }).then(function() {
+      checkAndOfferWebsiteUpdate(silent);
+    });
+  }
+
+  function checkAndOfferWebsiteUpdate(silent) {
+    const changed = [];
+    getTrackedRows().forEach(function(row) {
+      const statusInput = row.querySelector('td:nth-child(5) .msg-cell input:not([type=checkbox])');
+      const newStatus = statusInput ? statusInput.value.trim() : '';
+      const originalStatus = row.dataset.originalStatus || '';
+      if (newStatus && newStatus !== originalStatus) {
+        changed.push({ row: row, containerNum: row.querySelector('td:nth-child(2) input').value || '—', newStatus: newStatus });
+      }
+    });
+
+    if (!changed.length) {
       if (!silent) showAlert('Geofit Logistics Hub', 'File saved successfully.');
+      return;
+    }
+
+    const list = changed.map(function(c) { return c.containerNum + ' → ' + c.newStatus; }).join('\n');
+    showConfirm(
+      'Update Your Website?',
+      'File saved successfully. Status changed for:\n' + list + '\n\nDo you also want to update your website with these changes, so clients can see the new status when they track their container?',
+      'Yes, Update Website',
+      function() { publishStatusChangesToWebsite(changed); }
+    );
+    // Either way, these are now the "known" values so we don't re-prompt for the same status again
+    changed.forEach(function(c) { c.row.dataset.originalStatus = c.newStatus; });
+  }
+
+  function publishStatusChangesToWebsite(changed) {
+    const fileNumber = document.getElementById('f-file-number').value || '';
+    const vesselName = document.getElementById('f-vessel-name').value || '';
+    const promises = changed.map(function(c) {
+      const dbId = c.row.dataset.dbId;
+      if (!dbId) return Promise.resolve();
+      return sbClient.from('public_status_history').insert({
+        container_id: dbId,
+        container_number: c.containerNum,
+        file_number: fileNumber,
+        vessel_name: vesselName,
+        status_text: c.newStatus
+      });
+    });
+    Promise.all(promises).then(function(results) {
+      const failed = results.find(function(r) { return r && r.error; });
+      if (failed) { showAlert('Could Not Update Website', failed.error.message); return; }
+      showAlert('Geofit Logistics Hub', 'Website updated successfully! Clients can now track the new status.');
     });
   }
 
@@ -2003,6 +2048,7 @@
     row.dataset.source = existing ? (existing.tracking_source || 'Not yet tracked') : 'Not yet tracked';
     row.dataset.checked = existing && existing.tracking_checked_at ? formatDateTime(new Date(existing.tracking_checked_at)) : '—';
     row.dataset.stageHistory = JSON.stringify(existing && existing.tracking_stage_history ? existing.tracking_stage_history : {});
+    row.dataset.originalStatus = existing ? (existing.current_status || '') : '';
     if (existing) row.dataset.dbId = existing.id;
     const statusClass = existing && existing.status === 'Closed' ? 'status-closed' : 'status-open';
     const statusLabel = existing && existing.status === 'Closed' ? 'Closed' : 'Open';
