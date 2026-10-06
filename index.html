@@ -960,9 +960,10 @@
     }
     if (name === 'financials') {
       populateReportDropdown('transporters', 'name', 'fin-report-transporter', 'Transporter');
-      loadCaptureTransporterOptions();
       document.getElementById('capture-search').value = '';
-      loadCaptureQueue();
+      loadCaptureTransporterOptions().then(function() {
+        loadCaptureQueue();
+      });
     }
   }
 
@@ -1285,37 +1286,52 @@
   let captureTransporterOptions = [];
 
   function loadCaptureTransporterOptions() {
-    sbClient.from('transporters').select('name').order('name').then(function(res) {
+    return sbClient.from('transporters').select('name').order('name').then(function(res) {
       captureTransporterOptions = (res.data || []).map(function(r) { return r.name; });
     });
   }
+
+  const CAPTURE_SELECT_FIELDS = 'id, container_number, gf_invoice, gf_inv_value, transporter_name, transporter_invoice, transporter_total, invoice_date, paid, payment_remarks, file_id, shipment_files!inner(file_number, client_name, delivery_address, transporter)';
 
   // Loads automatically the moment Financials opens — every unpaid container,
   // across every file, no searching required. Typing in the search box
   // narrows this down (and, while searching, also reveals already-paid
   // records so a specific one can still be found and corrected if needed).
+  // Filtering across the container number AND the joined file number is done
+  // as two separate queries merged together — PostgREST doesn't reliably
+  // support combining a local-table and a joined-table condition in one
+  // .or() filter, which was the actual cause of "valid container number
+  // says no records".
   function loadCaptureQueue() {
     const term = document.getElementById('capture-search').value.trim();
-    let query = sbClient.from('containers')
-      .select('id, container_number, gf_invoice, gf_inv_value, transporter_name, transporter_invoice, transporter_total, invoice_date, paid, payment_remarks, file_id, shipment_files!inner(file_number, client_name, delivery_address, transporter)');
 
-    if (term) {
-      query = query.or('container_number.ilike.%' + term + '%,shipment_files.file_number.ilike.%' + term + '%');
-    } else {
-      query = query.eq('paid', false);
+    if (!term) {
+      sbClient.from('containers').select(CAPTURE_SELECT_FIELDS).eq('paid', false).then(function(res) {
+        finishLoadCaptureQueue(res, '', 'Unpaid: ');
+      });
+      return;
     }
 
-    query.then(function(res) {
-      if (res.error) { showAlert('Could Not Load', res.error.message); return; }
-      captureContainers = res.data || [];
-      captureContainers.sort(function(a, b) {
-        const fa = (a.shipment_files.file_number || ''), fb = (b.shipment_files.file_number || '');
-        return fa < fb ? -1 : (fa > fb ? 1 : 0);
-      });
-      const label = term ? ('Matching "' + term + '": ') : 'Unpaid: ';
-      document.getElementById('capture-file-label').textContent = label + captureContainers.length + ' container' + (captureContainers.length === 1 ? '' : 's');
-      renderCaptureRows();
+    const byContainer = sbClient.from('containers').select(CAPTURE_SELECT_FIELDS).ilike('container_number', '%' + term + '%');
+    const byFile = sbClient.from('containers').select(CAPTURE_SELECT_FIELDS).ilike('shipment_files.file_number', '%' + term + '%');
+
+    Promise.all([byContainer, byFile]).then(function(results) {
+      const err = results.find(function(r) { return r.error; });
+      if (err) { showAlert('Could Not Load', err.error.message); return; }
+      const merged = {};
+      results.forEach(function(r) { (r.data || []).forEach(function(row) { merged[row.id] = row; }); });
+      finishLoadCaptureQueue({ data: Object.values(merged) }, term, 'Matching "' + term + '": ');
     });
+  }
+
+  function finishLoadCaptureQueue(res, term, labelPrefix) {
+    captureContainers = res.data || [];
+    captureContainers.sort(function(a, b) {
+      const fa = (a.shipment_files.file_number || ''), fb = (b.shipment_files.file_number || '');
+      return fa < fb ? -1 : (fa > fb ? 1 : 0);
+    });
+    document.getElementById('capture-file-label').textContent = labelPrefix + captureContainers.length + ' container' + (captureContainers.length === 1 ? '' : 's');
+    renderCaptureRows();
   }
 
   function searchPaymentCapture() { loadCaptureQueue(); }
