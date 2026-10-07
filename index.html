@@ -391,7 +391,7 @@
 <div class="sidebar">
   <div class="sidebar-logo">GEOFIT LOGISTICS HUB</div>
   <div class="sidebar-nav">
-    <div class="sidebar-link" id="nav-dashboard" onclick="showToast('Dashboard isn\'t built yet')"><span class="ic">&#9635;</span> Dashboard</div>
+    <div class="sidebar-link" id="nav-dashboard" onclick="showView('dashboard')"><span class="ic">&#9635;</span> Dashboard</div>
     <div class="sidebar-link active" id="nav-registration" onclick="showView('registration')"><span class="ic">&#128196;</span> Shipment Registration</div>
     <div class="sidebar-link" id="nav-reports" onclick="showView('reports')"><span class="ic">&#128202;</span> Reports</div>
     <div class="sidebar-link" id="nav-financials" onclick="handleFinancialsClick()"><span class="ic">&#128176;</span> Financials</div>
@@ -530,6 +530,23 @@
       <input id="f-rate" placeholder="e.g. R2700.00 / 12m">
     </div>
   </div>
+  </div>
+  </div>
+
+  <div class="page-pad" id="view-dashboard" style="display:none;">
+  <div class="wrap">
+    <div class="page-head"><h2>Geofit Dash Board - Current Open Files</h2></div>
+    <div class="panel accent-top">
+      <div class="panel-title"><span class="bar"></span>Open Files by Transporter &amp; Client</div>
+      <div id="dashboard-empty" style="display:none; font-size:13px; color:var(--text-soft); padding:30px 0; text-align:center;">
+        No Open files found yet.
+      </div>
+      <div style="overflow-x:auto;">
+        <div id="dashboard-chart-wrap" style="min-width:600px; height:420px;">
+          <canvas id="dashboard-chart"></canvas>
+        </div>
+      </div>
+    </div>
   </div>
   </div>
 
@@ -763,6 +780,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script>
   const SUPABASE_URL = "https://ffkcukglohdifxcvrafz.supabase.co";
   const SUPABASE_KEY = "sb_publishable_AfKi7sWGCiuh3Jx_Mw1BHg_LWmXgAQQ";
@@ -939,6 +957,74 @@
     });
   }
 
+  /* ── Dashboard: Open Files by Transporter & Client ── */
+  let dashboardChartInstance = null;
+  const CHART_COLORS = ['#0f2a4a', '#16a34a', '#f59e0b', '#8b5cf6', '#3b82f6', '#dc2626', '#0891b2', '#be185d'];
+
+  function loadDashboardChart() {
+    sbClient.from('containers')
+      .select('shipment_files!inner(transporter, client_name)')
+      .eq('status', 'Open')
+      .then(function(res) {
+        if (res.error) { showToast('Could not load dashboard data'); return; }
+        renderDashboardChart(res.data || []);
+      });
+  }
+
+  function renderDashboardChart(rows) {
+    const empty = document.getElementById('dashboard-empty');
+    const wrap = document.getElementById('dashboard-chart-wrap');
+    if (!rows.length) {
+      empty.style.display = 'block';
+      wrap.style.display = 'none';
+      return;
+    }
+    empty.style.display = 'none';
+    wrap.style.display = 'block';
+
+    // Build { transporter: { client: count } }
+    const counts = {};
+    const transporters = [];
+    const clients = [];
+    rows.forEach(function(r) {
+      const t = r.shipment_files.transporter || 'Unassigned';
+      const c = r.shipment_files.client_name || 'Unassigned';
+      if (transporters.indexOf(t) === -1) transporters.push(t);
+      if (clients.indexOf(c) === -1) clients.push(c);
+      if (!counts[t]) counts[t] = {};
+      counts[t][c] = (counts[t][c] || 0) + 1;
+    });
+    transporters.sort();
+    clients.sort();
+
+    const datasets = clients.map(function(client, i) {
+      return {
+        label: client,
+        data: transporters.map(function(t) { return (counts[t] && counts[t][client]) || 0; }),
+        backgroundColor: CHART_COLORS[i % CHART_COLORS.length]
+      };
+    });
+
+    // Wide enough to breathe if there are a lot of transporters — scrolls horizontally rather than squeezing
+    document.getElementById('dashboard-chart-wrap').style.minWidth = Math.max(600, transporters.length * 120) + 'px';
+
+    const ctx = document.getElementById('dashboard-chart').getContext('2d');
+    if (dashboardChartInstance) dashboardChartInstance.destroy();
+    dashboardChartInstance = new Chart(ctx, {
+      type: 'bar',
+      data: { labels: transporters, datasets: datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          x: { title: { display: true, text: 'Transporter' } },
+          y: { title: { display: true, text: 'Open Containers' }, beginAtZero: true, ticks: { stepSize: 1 } }
+        },
+        plugins: { legend: { position: 'bottom' } }
+      }
+    });
+  }
+
   function showFinTab(name) {
     ['capture', 'report'].forEach(function(n) {
       document.getElementById('fpanel-' + n).style.display = (n === name) ? 'block' : 'none';
@@ -949,11 +1035,16 @@
   function showView(name) {
     document.getElementById('registration-topbar').style.display = (name === 'registration') ? 'flex' : 'none';
     document.getElementById('view-registration').style.display = (name === 'registration') ? 'block' : 'none';
+    document.getElementById('view-dashboard').style.display = (name === 'dashboard') ? 'block' : 'none';
     document.getElementById('view-reports').style.display = (name === 'reports') ? 'block' : 'none';
     document.getElementById('view-financials').style.display = (name === 'financials') ? 'block' : 'none';
     document.getElementById('nav-registration').classList.toggle('active', name === 'registration');
+    document.getElementById('nav-dashboard').classList.toggle('active', name === 'dashboard');
     document.getElementById('nav-reports').classList.toggle('active', name === 'reports');
     document.getElementById('nav-financials').classList.toggle('active', name === 'financials');
+    if (name === 'dashboard') {
+      loadDashboardChart();
+    }
     if (name === 'reports') {
       populateReportDropdown('clients', 'name', 'report-client', 'Client');
       populateReportDropdown('transporters', 'name', 'report-transporter', 'Transporter');
