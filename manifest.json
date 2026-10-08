@@ -1,0 +1,14 @@
+{
+  "name": "Geofit Logistics Hub",
+  "short_name": "Geofit Hub",
+  "description": "Geofit internal operations system",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0f2a4a",
+  "theme_color": "#0f2a4a",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
