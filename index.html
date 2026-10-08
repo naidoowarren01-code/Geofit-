@@ -538,6 +538,10 @@
     <div class="page-head"><h2>Geofit Dash Board - Current Open Files</h2></div>
     <div class="panel accent-top">
       <div class="panel-title"><span class="bar"></span>Open Files by Transporter &amp; Client</div>
+      <div style="display:flex; align-items:baseline; gap:12px; margin-bottom:18px;">
+        <span style="font-size:15px; font-weight:600; color:var(--text);">Shipments Opened:</span>
+        <span id="dashboard-shipment-count" style="font-size:30px; font-weight:800; color:var(--header);">0</span>
+      </div>
       <div id="dashboard-empty" style="display:none; font-size:13px; color:var(--text-soft); padding:30px 0; text-align:center;">
         No Open files found yet.
       </div>
@@ -838,6 +842,7 @@
         if (res.data && res.data.full_name) document.getElementById('staff-email').textContent = res.data.full_name;
       });
     loadDropdownData();
+    showView('dashboard');
   }
 
   sbClient.auth.getSession().then(function(result) {
@@ -963,7 +968,7 @@
 
   function loadDashboardChart() {
     sbClient.from('containers')
-      .select('shipment_files!inner(transporter, client_name)')
+      .select('file_id, shipment_files!inner(transporter, client_name)')
       .eq('status', 'Open')
       .then(function(res) {
         if (res.error) { showToast('Could not load dashboard data'); return; }
@@ -974,6 +979,12 @@
   function renderDashboardChart(rows) {
     const empty = document.getElementById('dashboard-empty');
     const wrap = document.getElementById('dashboard-chart-wrap');
+
+    // "Shipments Opened" = number of distinct files that currently have at least one Open container
+    const openFileIds = {};
+    rows.forEach(function(r) { if (r.file_id) openFileIds[r.file_id] = true; });
+    document.getElementById('dashboard-shipment-count').textContent = Object.keys(openFileIds).length;
+
     if (!rows.length) {
       empty.style.display = 'block';
       wrap.style.display = 'none';
